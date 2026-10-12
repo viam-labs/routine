@@ -1,0 +1,111 @@
+{
+  "start_mode": "idle",
+  "on_dependency_error": "retry_step",
+  "modes": {
+    "idle": {
+      "steps": [
+        {
+          "resource": "delivery_nav",
+          "method": "NavigateToLocation",
+          "request": { "location_name": "coffee_maker_staging" },
+          "wait": true
+        },
+        {
+          "until": {
+            "every": "10s",
+            "resource": "coffee_maker:orders",
+            "method": "DoCommand",
+            "request": { "command": { "query": "next_delivery_order" } },
+            "when": "result.available"
+          },
+          "then": "pickup",
+          "pass": { "order": { "from": "result.order" } }
+        }
+      ]
+    },
+    "pickup": {
+      "steps": [
+        {
+          "resource": "delivery_nav",
+          "method": "GoToLocation",
+          "request": {
+            "location_name": "coffee_maker_dock",
+            "linear_m_per_sec": 0.2
+          },
+          "wait": true
+        },
+        {
+          "resource": "tray",
+          "method": "Move",
+          "request": { "angle_deg": 90 }
+        },
+        {
+          "resource": "coffee_maker:orders",
+          "method": "DoCommand",
+          "request": {
+            "command": {
+              "ready_for_order": { "order_id": { "from": "order.id" } }
+            }
+          }
+        },
+        {
+          "until": {
+            "every": "5s",
+            "resource": "coffee_maker:orders",
+            "method": "DoCommand",
+            "request": {
+              "command": {
+                "order_status": { "order_id": { "from": "order.id" } }
+              }
+            },
+            "when": "result.status == handed_over",
+            "cancel_when": "result.status == canceled",
+            "timeout": "3m"
+          }
+        },
+        {
+          "resource": "tray",
+          "method": "Move",
+          "request": { "angle_deg": 0 }
+        }
+      ],
+      "then": "delivering",
+      "pass": { "order": { "from": "order" } },
+      "on_cancel": {
+        "steps": [
+          {
+            "resource": "tray",
+            "method": "Move",
+            "request": { "angle_deg": 0 }
+          }
+        ],
+        "then": "idle"
+      }
+    },
+    "delivering": {
+      "steps": [
+        {
+          "resource": "delivery_nav",
+          "method": "NavigateToLocation",
+          "request": { "location_name": { "from": "order.destination" } },
+          "wait": true
+        },
+        {
+          "resource": "speaker",
+          "method": "Play",
+          "request": { "sound": "delivery_arrived" }
+        },
+        {
+          "until": {
+            "every": "1s",
+            "resource": "cup_watcher",
+            "method": "DoCommand",
+            "request": { "command": { "query": "cup_present" } },
+            "when": "result.cup_present == false"
+          }
+        }
+      ],
+      "then": "idle"
+    }
+  }
+}

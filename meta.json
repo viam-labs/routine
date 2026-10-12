@@ -1,0 +1,24 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "viam-labs:routine",
+  "visibility": "public",
+  "url": "https://github.com/viam-labs/routine",
+  "description": "Run configured state machines that call methods on other Viam resources.",
+  "models": [
+    {
+      "api": "rdk:service:generic",
+      "model": "viam-labs:service:routine",
+      "markdown_link": "README.md",
+      "short_description": "Configurable mode state machine over Viam resource APIs"
+    }
+  ],
+  "markdown_link": "README.md",
+  "entrypoint": "run.sh",
+  "first_run": "setup.sh",
+  "build": {
+    "setup": "./setup.sh",
+    "build": "./build.sh",
+    "path": "dist/archive.tar.gz",
+    "arch": ["darwin/arm64", "linux/amd64", "linux/arm64"]
+  }
+}

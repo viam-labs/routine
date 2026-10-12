@@ -1,0 +1,106 @@
+# routine
+
+`viam-labs:service:routine` is a [generic service](https://docs.viam.com/operate/reference/services/generic/) that runs one or more state machines, called modes. Each step calls a method on another resource already configured on the machine. The routine reads the response, polls with `until`, passes variables into the next mode, and can clean up with `on_cancel`.
+
+A full coffee-delivery config is in [examples/coffee_delivery.json](examples/coffee_delivery.json).
+
+## Configure
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `modes` | required | Named modes. Each has `steps`, and may have `then`, `pass`, `on_cancel`, and `on_dependency_error`. |
+| `start_mode` | `idle` | Mode entered on start. Must name a configured mode. |
+| `auto_start` | `true` | Start that mode when the service configures. |
+| `on_dependency_error` | `retry_step` | What to do when a resource call fails. `retry_step`, `restart_mode`, `start_mode`, or `stop`. |
+| `retry` | `1s`, max `30s` | Backoff for `retry_step`. Durations look like `500ms`, `10s`, `3m`, `1h`. |
+| `heartbeat` | off | Status report that runs on its own timer. |
+
+`on_dependency_error` may be set on the routine, on a mode, or on a step. The step wins, then the mode, then the routine.
+
+A mode with no `then` stops the routine after its last step. The same is true of `on_cancel`.
+
+### Call step
+
+```json
+{
+  "resource": "tray",
+  "method": "Move",
+  "request": { "angle_deg": 90 },
+  "wait": false,
+  "timeout": "5s",
+  "then": "next_mode",
+  "pass": { "order": { "from": "order" } },
+  "on_dependency_error": "stop"
+}
+```
+
+`method` is the resource's gRPC method. `Move` and `do_command` both work. The routine fills in the resource `name`. Calls wait for a response unless `wait` is `false`, in which case the call runs in the background until the mode changes.
+
+`DoCommand` responses are unwrapped, so a returned `available` field is read as `result.available`.
+
+### Until step
+
+```json
+{
+  "until": {
+    "every": "5s",
+    "resource": "coffee_maker:orders",
+    "method": "DoCommand",
+    "request": { "command": { "order_status": { "order_id": { "from": "order.id" } } } },
+    "when": "result.status == handed_over",
+    "cancel_when": "result.status == canceled",
+    "timeout": "3m"
+  },
+  "then": "delivering",
+  "pass": { "order": { "from": "result.order" } }
+}
+```
+
+The method is polled immediately, then every `every`, until `when` is true. `cancel_when` or `timeout` runs the mode's `on_cancel` block. For an until step, `result` is the last poll.
+
+### Variables
+
+`{"from": "order.id"}` copies a value from the current variables, the latest `result`, or `status`. `pass` replaces the variable set for the next mode. Variables are not kept automatically, so a mode that needs an earlier value has to pass it on.
+
+In the delivery example, pickup's `pass` copies the existing `order` variable. The last pickup step moves the tray, so `result` at the end of the mode is that move, not the order.
+
+`{"literal": {"from": "keep this object"}}` passes a value that itself has a `from` key.
+
+### Expressions
+
+`when` and `cancel_when` accept comparisons (`== != < <= > >=`), `and`, `or`, `not`, parentheses, numbers, quoted strings, `true`, `false`, and `null`. A bare word that is not a variable is a string, so `result.status == handed_over` matches the string `handed_over`. Dotted fields and indexes (`result.items[0].name`) are supported.
+
+### Heartbeat
+
+```json
+"heartbeat": {
+  "every_secs": 5,
+  "resource": "fleet_status",
+  "method": "DoCommand",
+  "request": { "command": { "mode": { "from": "status.mode" }, "state": { "from": "status.state" } } }
+}
+```
+
+`every_secs` defaults to 5. The heartbeat keeps reporting after the routine stops. A failed report is logged and does not change the mode.
+
+## Commands
+
+`do_command` accepts:
+
+| `command` | Extra fields | Effect |
+| --- | --- | --- |
+| `status` | | `state`, `mode`, `step_index`, `step_count`, `step_kind`, `vars`, `last_error`, `mode_entered_at`, `updated_at` |
+| `start` | `mode`, `vars` | Start `mode`, or `start_mode`. |
+| `stop` | | Stop without running `on_cancel`. |
+| `set_mode` | `mode`, `vars` | Jump to a mode. |
+| `cancel` | | Run the current mode's `on_cancel`. |
+
+## Development
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest
+```
+
+Tests host fake servo, generic, and custom navigation resources on an in-process gRPC server. Custom APIs are loaded through server reflection.
