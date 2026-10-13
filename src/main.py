@@ -5,7 +5,10 @@ import asyncio
 from viam.module.module import Module
 
 from routine.parent import set_module
+from routine.sdkdeps import install
 from routine.service import Routine
+
+install()
 
 
 async def main() -> None:
