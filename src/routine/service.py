@@ -59,6 +59,10 @@ class Routine(Generic, EasyResource):
         if self._boot_error:
             raise RuntimeError(self._boot_error)
 
+    async def get_status(self, *, timeout: Optional[float] = None, **kwargs: Any) -> Mapping[str, ValueTypes]:
+        del timeout, kwargs
+        return await self._status()
+
     async def do_command(
         self,
         command: Mapping[str, ValueTypes],
@@ -72,8 +76,10 @@ class Routine(Generic, EasyResource):
         if engine is None or self._cfg is None:
             raise RuntimeError("routine is not configured")
         name = command.get("command")
+        if name in ("GetStatus", "get_status"):
+            return await self._status()
         if name == "status":
-            return {"status": engine.snapshot()}
+            return {"status": await self._status()}
         if name == "start":
             await engine.start(_optional_mode(command.get("mode")), _optional_vars(command.get("vars")))
             return {"ok": True}
@@ -89,7 +95,7 @@ class Routine(Generic, EasyResource):
         if name == "cancel":
             engine.request_cancel()
             return {"ok": True}
-        raise ValueError("command must be status, start, stop, set_mode, or cancel")
+        raise ValueError("command must be GetStatus, status, start, stop, set_mode, or cancel")
 
     async def stop(self, *, extra: Optional[Mapping[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any) -> None:
         del extra, timeout, kwargs
@@ -143,6 +149,14 @@ class Routine(Generic, EasyResource):
         self._engine = None
         if engine is not None:
             await engine.stop()
+
+
+    async def _status(self) -> dict[str, Any]:
+        await self.ready()
+        engine = self._engine
+        if engine is None:
+            raise RuntimeError("routine is not configured")
+        return engine.snapshot()
 
 
 def _method_pairs(config: RoutineConfig) -> list[tuple[str, str]]:

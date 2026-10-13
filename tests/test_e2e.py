@@ -468,7 +468,10 @@ async def test_do_command_controls():
         await lab.service.do_command({"command": "stop"})
         await asyncio.sleep(0.08)
         assert len(parked.calls) == parks
-        assert (await _status(lab.service))["state"] == "stopped"
+        status = await _status(lab.service)
+        assert status["state"] == "stopped"
+        assert await lab.service.get_status() == status
+        assert await lab.service.do_command({"command": "GetStatus"}) == status
     finally:
         await lab.close()
 
