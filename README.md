@@ -128,7 +128,7 @@ A step can call a module API that is not built into the Viam SDK, such as [actio
 | `status` | | The status object nested under `status`. |
 | `GetStatus` | | That same object at the top level. `get_status` is the same command. |
 
-The service method `GetStatus` returns that object directly. That is what the machine control tab calls. A heartbeat reads the same object as `status`. Its fields are `state`, `mode`, `step_index`, `step_count`, `step_kind`, `vars`, `last_error`, `mode_entered_at`, and `updated_at`.
+The service method `GetStatus` returns that object directly. That is what the machine control tab calls. A heartbeat reads the same object as `status`. Its fields are `state`, `mode`, `step_index`, `step_count`, `step_kind`, `vars`, `last_error`, `result`, `mode_entered_at`, and `updated_at`. `result` is the latest response, including each `until` poll.
 | `start` | `mode`, `vars` | Start `mode`, or `start_mode`. |
 | `stop` | | Stop without running `on_cancel`. |
 | `set_mode` | `mode`, `vars` | Jump to a mode. |

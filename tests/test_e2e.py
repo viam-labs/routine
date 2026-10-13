@@ -537,3 +537,34 @@ async def test_sleep_waits_between_calls():
         assert relay.calls == [{"position": 1}, {"position": 0}]
     finally:
         await lab.close()
+
+
+@pytest.mark.asyncio
+async def test_status_includes_latest_poll_result():
+    dock = ScriptedGeneric("docking")
+    dock.respond = lambda _command: {"running": True}
+    config = {
+        "start_mode": "test",
+        "modes": {
+            "test": {
+                "steps": [
+                    {
+                        "until": {
+                            "every": "1h",
+                            "resource": "docking",
+                            "method": "DoCommand",
+                            "request": {"command": {"query": "status"}},
+                            "when": "result.running == false",
+                        }
+                    }
+                ]
+            }
+        },
+    }
+    lab = await start_lab(config, [dock])
+    try:
+        status = await _wait(lab.service, lambda current: current.get("result") == {"running": True})
+        assert status["step_kind"] == "until"
+        assert status["state"] == "running"
+    finally:
+        await lab.close()

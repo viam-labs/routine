@@ -49,6 +49,7 @@ class Engine:
             "vars": {},
             "last_error": None,
             "mode_entered_at": None,
+            "result": None,
             "updated_at": _now(),
         }
         self._runner: Optional[asyncio.Task[None]] = None
@@ -61,6 +62,7 @@ class Engine:
     def snapshot(self) -> dict[str, Any]:
         snap = dict(self.status)
         snap["vars"] = _copy(self.status["vars"])
+        snap["result"] = _copy(self.status["result"])
         return snap
 
     async def start(self, mode: Optional[str] = None, variables: Optional[dict[str, Any]] = None) -> None:
@@ -242,7 +244,9 @@ class Engine:
         async def attempt() -> Any:
             return await self.invoker.call(step.resource, step.method, request, timeout=step.timeout)
 
-        return await self._with_policy(attempt, step, mode)
+        value = await self._with_policy(attempt, step, mode)
+        self._set_result(value)
+        return value
 
     async def _background_call(self, step: CallStep, request: dict[str, Any]) -> None:
         try:
@@ -264,6 +268,7 @@ class Engine:
                 return await self.invoker.call(step.resource, step.method, request)
 
             result = await self._with_policy(attempt, step, mode)
+            self._set_result(result)
             poll_scope = {**scope, "result": result, "status": self.snapshot()}
             try:
                 if step.cancel_expr is not None and is_true(step.cancel_expr, poll_scope):
@@ -355,6 +360,10 @@ class Engine:
             with suppress(asyncio.CancelledError, Exception):
                 await task
         self._background.clear()
+
+    def _set_result(self, result: Any) -> None:
+        self.status["result"] = _copy(result)
+        self._touch()
 
     def _touch(self) -> None:
         self.status["updated_at"] = _now()
