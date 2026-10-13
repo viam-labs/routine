@@ -15,6 +15,7 @@ from google.protobuf.message_factory import GetMessageClass
 from grpclib import GRPCError
 from grpclib.const import Cardinality, Handler, Status
 from grpclib.reflection.service import ServerReflection
+from grpclib.server import Server as GRPCServer
 
 from viam.components.servo import Servo
 from viam.proto.common import ResourceName
@@ -54,6 +55,7 @@ class Lab:
     serve_task: asyncio.Task[None]
     robot: RobotClient
     service: Routine
+    module_server: GRPCServer
     nav: Optional[RecordedService] = None
     speaker: Optional[RecordedService] = None
     _tmpdir: Any = field(repr=False, default=None)
@@ -61,6 +63,8 @@ class Lab:
     async def close(self) -> None:
         await self.service.stop()
         await self.robot.close()
+        self.module_server.close()
+        await self.module_server.wait_closed()
         self.server._server.close()
         await self.serve_task
         if self._tmpdir is not None:
@@ -77,10 +81,15 @@ async def start_lab(config: dict[str, Any], resources: list[Any]) -> Lab:
     server = Server(builtin)
     _install_robot_rpcs(server, custom)
     _install_custom_rpcs(server, pool, nav, speaker)
-    _install_reflection(server, pool)
 
     tmp = tempfile.TemporaryDirectory()
     socket_path = os.path.join(tmp.name, "robot.sock")
+    # viam-server does not publish custom API protos. The providing module does.
+    module_server = GRPCServer(
+        [ServerReflection(_service_names=[NAV_SERVICE, SPEAKER_SERVICE], _pool=pool)]
+    )
+    module_socket = os.path.join(tmp.name, "action-module.sock")
+    await module_server.start(path=module_socket)
     serve_task = asyncio.create_task(server._serve(path=socket_path, log_level=logging.ERROR))
     for _ in range(200):
         if os.path.exists(socket_path):
@@ -109,6 +118,8 @@ async def start_lab(config: dict[str, Any], resources: list[Any]) -> Lab:
         await service.ready()
     except Exception:
         await robot.close()
+        module_server.close()
+        await module_server.wait_closed()
         server._server.close()
         await serve_task
         tmp.cleanup()
@@ -119,6 +130,7 @@ async def start_lab(config: dict[str, Any], resources: list[Any]) -> Lab:
         serve_task=serve_task,
         robot=robot,
         service=service,
+        module_server=module_server,
         nav=nav,
         speaker=speaker,
         _tmpdir=tmp,
@@ -214,11 +226,3 @@ def _install_custom_rpcs(
     add(NAV_SERVICE, "NavigateToLocation", nav)
     add(NAV_SERVICE, "GoToLocation", nav)
     add(SPEAKER_SERVICE, "Play", speaker)
-
-
-def _install_reflection(server: Server, pool: Any) -> None:
-    reflection = ServerReflection(
-        _service_names=[NAV_SERVICE, SPEAKER_SERVICE],
-        _pool=pool,
-    )
-    server._server._mapping.update(reflection.__mapping__())

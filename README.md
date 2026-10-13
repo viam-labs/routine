@@ -83,6 +83,28 @@ In the delivery example, pickup's `pass` copies the existing `order` variable. T
 
 `every_secs` defaults to 5. The heartbeat keeps reporting after the routine stops. A failed report is logged and does not change the mode.
 
+## Custom APIs
+
+A step can call a module API that is not built into the Viam SDK, such as [action-api](https://github.com/viam-labs/action-api). Use the proto method name. The routine fills in `name`, and it loads the proto from the module that provides the API.
+
+```json
+{ "resource": "brewer", "method": "Start", "request": {} }
+```
+
+```json
+{
+  "until": {
+    "every": "1s",
+    "resource": "brewer",
+    "method": "IsRunning",
+    "request": {},
+    "when": "result.running == false"
+  }
+}
+```
+
+`Status` returns a map, so later steps read `result.status.<key>`.
+
 ## Commands
 
 `do_command` accepts:
@@ -103,4 +125,4 @@ python3 -m venv .venv
 .venv/bin/pytest
 ```
 
-Tests host fake servo, generic, and custom navigation resources on an in-process gRPC server. Custom APIs are loaded through server reflection.
+Tests host fake servo, generic, and custom navigation resources on an in-process gRPC server. Custom API protos are served by a sibling module socket, the same place viam-server leaves them.

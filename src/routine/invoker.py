@@ -1,8 +1,8 @@
 """Call a resource method by name over the parent robot's gRPC channel.
 
 Standard Viam APIs are resolved from the protobuf descriptor pool. Custom APIs
-are loaded with gRPC server reflection. ``DoCommand`` responses are unwrapped
-so expressions can read ``result.<field>``.
+are loaded by reflecting the module that provides them. ``DoCommand`` responses
+are unwrapped so expressions can read ``result.<field>``.
 """
 
 from __future__ import annotations
@@ -12,15 +12,13 @@ import pkgutil
 from typing import Any, Optional
 
 from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
-from google.protobuf.descriptor_pb2 import FileDescriptorProto
-from google.protobuf.descriptor_pool import Default, DescriptorPool
+from google.protobuf.descriptor_pool import Default
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.message import Message
 from google.protobuf.message_factory import GetMessageClass
 from grpclib.client import UnaryUnaryMethod
-from grpclib.reflection.v1.reflection_grpc import ServerReflectionStub
-from grpclib.reflection.v1.reflection_pb2 import ServerReflectionRequest
 
+from routine.reflect import DescriptorNotFound, load_service
 from viam.proto.robot import (
     ResourceNamesRequest,
     ResourceRPCSubtypesRequest,
@@ -96,30 +94,18 @@ class Invoker:
         try:
             service = pool.FindServiceByName(full_name)
         except KeyError:
-            service = await self._reflect(full_name)
+            try:
+                service = await load_service(self.channel, full_name)
+            except DescriptorNotFound as exc:
+                raise InvokerError(
+                    f"could not load proto service {full_name}. "
+                    "The module that provides this API must be running on the machine."
+                ) from exc
+            except Exception as exc:
+                raise InvokerError(f"could not load proto service {full_name}: {exc}") from exc
             self.reflected.add(full_name)
         self._services[full_name] = service
         return service
-
-    async def _reflect(self, full_name: str) -> ServiceDescriptor:
-        stub = ServerReflectionStub(self.channel)
-        async with stub.ServerReflectionInfo.open() as stream:
-            await stream.send_message(ServerReflectionRequest(file_containing_symbol=full_name), end=True)
-            reply = await stream.recv_message()
-        if reply is None or not reply.HasField("file_descriptor_response"):
-            message = ""
-            if reply is not None and reply.HasField("error_response"):
-                message = reply.error_response.error_message
-            raise InvokerError(f"reflection did not return a descriptor for {full_name}: {message}")
-        pool = DescriptorPool()
-        for raw in reply.file_descriptor_response.file_descriptor_proto:
-            proto = FileDescriptorProto()
-            proto.ParseFromString(raw)
-            pool.Add(proto)
-        try:
-            return pool.FindServiceByName(full_name)
-        except KeyError as exc:
-            raise InvokerError(f"reflection response did not include service {full_name}") from exc
 
 
 def build_request(method: MethodDescriptor, resource: str, payload: dict[str, Any]) -> Message:
