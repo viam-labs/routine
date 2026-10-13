@@ -53,7 +53,20 @@ class UntilStep:
         return "until"
 
 
-Step = Union[CallStep, UntilStep]
+@dataclass
+class SleepStep:
+    duration: float
+
+    @property
+    def kind(self) -> str:
+        return "sleep"
+
+    @property
+    def then(self) -> None:
+        return None
+
+
+Step = Union[CallStep, UntilStep, SleepStep]
 
 
 @dataclass
@@ -104,7 +117,9 @@ class RoutineConfig:
 
         for mode in self.modes.values():
             for step in _all_steps(mode):
-                add(step.resource)
+                resource = getattr(step, "resource", None)
+                if isinstance(resource, str):
+                    add(resource)
         if self.heartbeat is not None:
             add(self.heartbeat.resource)
         return found
@@ -244,13 +259,16 @@ def _parse_on_cancel(raw: Any, mode: str) -> Optional[OnCancel]:
 def _parse_step(raw: Any, where: str) -> Step:
     if not isinstance(raw, dict):
         raise ConfigError(f"{where} must be an object")
-    if "until" in raw and "resource" in raw:
-        raise ConfigError(f"{where} must be either a call or an until, not both")
+    kinds = [key for key in ("until", "sleep", "resource", "method") if key in raw]
+    if len(kinds) > 1 and not (set(kinds) <= {"resource", "method"}):
+        raise ConfigError(f"{where} must be a call, an until, or a sleep")
     if "until" in raw:
         return _parse_until(raw, where)
+    if "sleep" in raw:
+        return _parse_sleep(raw, where)
     if "resource" in raw or "method" in raw:
         return _parse_call(raw, where)
-    raise ConfigError(f"{where} needs resource and method, or until")
+    raise ConfigError(f"{where} needs resource and method, until, or sleep")
 
 
 _CALL_FIELDS = {"resource", "method", "request", "wait", "timeout", "then", "pass", "on_dependency_error"}
@@ -287,6 +305,16 @@ def _parse_call(raw: dict[str, Any], where: str) -> CallStep:
         pass_vars=_optional_object(raw.get("pass"), f"{where} pass"),
         on_dependency_error=_optional_policy(raw.get("on_dependency_error"), f"{where} on_dependency_error"),
     )
+
+
+def _parse_sleep(raw: dict[str, Any], where: str) -> SleepStep:
+    unknown = set(raw) - {"sleep"}
+    if unknown:
+        raise ConfigError(f"{where} has unknown fields: {', '.join(sorted(unknown))}")
+    duration = parse_duration(raw.get("sleep"), where=f"{where} sleep")
+    if duration <= 0:
+        raise ConfigError(f"{where} sleep must be greater than 0")
+    return SleepStep(duration=duration)
 
 
 def _parse_until(raw: dict[str, Any], where: str) -> UntilStep:

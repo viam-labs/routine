@@ -159,14 +159,21 @@ class Routine(Generic, EasyResource):
         return engine.snapshot()
 
 
+def _add_method(pairs: list[tuple[str, str]], step: Any) -> None:
+    resource = getattr(step, "resource", None)
+    method = getattr(step, "method", None)
+    if isinstance(resource, str) and isinstance(method, str):
+        pairs.append((resource, method))
+
+
 def _method_pairs(config: RoutineConfig) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for mode in config.modes.values():
         for step in mode.steps:
-            pairs.append((step.resource, step.method))
+            _add_method(pairs, step)
         if mode.on_cancel is not None:
             for step in mode.on_cancel.steps:
-                pairs.append((step.resource, step.method))
+                _add_method(pairs, step)
     if config.heartbeat is not None:
         pairs.append((config.heartbeat.resource, config.heartbeat.method))
     return pairs

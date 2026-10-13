@@ -512,3 +512,28 @@ async def test_heartbeat_reports_while_running_and_stopped():
         await _wait(lab.service, lambda _status: any(call.get("state") == "stopped" for call in fleet.calls))
     finally:
         await lab.close()
+
+
+@pytest.mark.asyncio
+async def test_sleep_waits_between_calls():
+    relay = ScriptedGeneric("relay")
+    config = {
+        "start_mode": "pulse",
+        "modes": {
+            "pulse": {
+                "steps": [
+                    {"resource": "relay", "method": "DoCommand", "request": {"command": {"position": 1}}},
+                    {"sleep": "200ms"},
+                    {"resource": "relay", "method": "DoCommand", "request": {"command": {"position": 0}}},
+                ]
+            }
+        },
+    }
+    lab = await start_lab(config, [relay])
+    try:
+        started = time.monotonic()
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["step_index"] == 2)
+        assert time.monotonic() - started >= 0.15
+        assert relay.calls == [{"position": 1}, {"position": 0}]
+    finally:
+        await lab.close()

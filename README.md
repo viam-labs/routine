@@ -44,6 +44,14 @@ For `DoCommand`, `request` is the command map, the same map the Go and Python SD
 
 `DoCommand` responses are unwrapped, so a returned `available` field is read as `result.available`.
 
+### Sleep step
+
+```json
+{ "sleep": "5s" }
+```
+
+The routine waits after the previous step returns, then runs the next step. Stopping or cancelling the mode ends the wait.
+
 ### Until step
 
 ```json

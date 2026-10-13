@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 from viam.logging import getLogger
 
-from routine.config import CallStep, Mode, RoutineConfig, Step, UntilStep, effective_policy
+from routine.config import CallStep, Mode, RoutineConfig, SleepStep, Step, UntilStep, effective_policy
 from routine.expr import ExprError, is_true
 from routine.invoker import Invoker
 from routine.refs import RefError, resolve
@@ -207,6 +207,9 @@ class Engine:
         scope = _scope(variables, result, self.snapshot())
 
         async def work() -> Any:
+            if isinstance(step, SleepStep):
+                await asyncio.sleep(step.duration)
+                return result
             if isinstance(step, UntilStep):
                 return await self._run_until(step, scope, mode)
             return await self._run_call(step, scope, mode)

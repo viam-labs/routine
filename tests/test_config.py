@@ -44,6 +44,26 @@ def test_policy_precedence_and_heartbeat_default():
     assert cfg.heartbeat.every_secs == 5
 
 
+def test_sleep_step_is_not_a_resource_dependency():
+    cfg = parse_config(
+        {
+            "start_mode": "pulse",
+            "modes": {
+                "pulse": {
+                    "steps": [
+                        {"resource": "relay", "method": "SetPosition", "request": {"position": 1}},
+                        {"sleep": "5s"},
+                        {"resource": "relay", "method": "SetPosition", "request": {"position": 0}},
+                    ]
+                }
+            }
+        }
+    )
+    assert [step.kind for step in cfg.modes["pulse"].steps] == ["call", "sleep", "call"]
+    assert cfg.modes["pulse"].steps[1].duration == 5
+    assert cfg.resources() == ["relay"]
+
+
 def test_mode_policy_overrides_global():
     cfg = parse_config(
         {
@@ -71,6 +91,8 @@ def test_mode_policy_overrides_global():
         {"on_dependency_error": "give_up", "modes": {"idle": {"steps": []}}},
         {"heartbeat": {"every_secs": 0, "resource": "a", "method": "B"}, "modes": {"idle": {"steps": []}}},
         {"modes": {}},
+        {"modes": {"idle": {"steps": [{"sleep": "0s"}]}}},
+        {"modes": {"idle": {"steps": [{"sleep": "5s", "resource": "relay"}]}}},
     ],
 )
 def test_invalid_config(raw):
