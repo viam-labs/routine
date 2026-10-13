@@ -108,9 +108,17 @@ class Invoker:
         return service
 
 
+_DO_COMMAND_FIELDS = {"name", "command"}
+
+
 def build_request(method: MethodDescriptor, resource: str, payload: dict[str, Any]) -> Message:
     message = GetMessageClass(method.input_type)()
     body = dict(payload)
+    # Match the Go and Python SDKs: the map passed to DoCommand is the command
+    # struct, and name is the resource. A request whose command is already an
+    # object is the gRPC message and is left alone.
+    if method.name == "DoCommand" and not _is_raw_do_command(body):
+        body = {"command": body}
     if "name" in message.DESCRIPTOR.fields_by_name and "name" not in body:
         body["name"] = resource
     try:
@@ -118,6 +126,10 @@ def build_request(method: MethodDescriptor, resource: str, payload: dict[str, An
     except Exception as exc:
         raise InvokerError(f"invalid request for {method.name}: {exc}") from exc
     return message
+
+
+def _is_raw_do_command(body: dict[str, Any]) -> bool:
+    return isinstance(body.get("command"), dict) and set(body).issubset(_DO_COMMAND_FIELDS)
 
 
 def decode_response(method: MethodDescriptor, response: Message) -> Any:

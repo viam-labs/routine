@@ -36,6 +36,12 @@ A mode with no `then` stops the routine after its last step. The same is true of
 
 `method` is the resource's gRPC method. `Move` and `do_command` both work. The routine fills in the resource `name`. Calls wait for a response unless `wait` is `false`, in which case the call runs in the background until the mode changes.
 
+For `DoCommand`, `request` is the command map, the same map the Go and Python SDKs pass to `DoCommand`. The routine places it in the `command` field and sets `name` to the resource. A request whose `command` is already an object is sent as the gRPC message, so a sibling `name` there selects the resource instead.
+
+```json
+{ "resource": "navigation", "method": "DoCommand", "request": { "command": "navigate_to_location", "name": "dock_test" } }
+```
+
 `DoCommand` responses are unwrapped, so a returned `available` field is read as `result.available`.
 
 ### Until step
@@ -46,7 +52,7 @@ A mode with no `then` stops the routine after its last step. The same is true of
     "every": "5s",
     "resource": "coffee_maker:orders",
     "method": "DoCommand",
-    "request": { "command": { "order_status": { "order_id": { "from": "order.id" } } } },
+    "request": { "order_status": { "order_id": { "from": "order.id" } } },
     "when": "result.status == handed_over",
     "cancel_when": "result.status == canceled",
     "timeout": "3m"
@@ -77,7 +83,7 @@ In the delivery example, pickup's `pass` copies the existing `order` variable. T
   "every_secs": 5,
   "resource": "fleet_status",
   "method": "DoCommand",
-  "request": { "command": { "mode": { "from": "status.mode" }, "state": { "from": "status.state" } } }
+  "request": { "mode": { "from": "status.mode" }, "state": { "from": "status.state" } }
 }
 ```
 

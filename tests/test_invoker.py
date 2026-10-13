@@ -1,4 +1,5 @@
 from google.protobuf.descriptor_pool import Default
+from google.protobuf.json_format import MessageToDict
 
 from viam.proto.common import DoCommandResponse
 from viam.utils import dict_to_struct
@@ -21,6 +22,24 @@ def test_move_request_injects_resource_name():
     assert message.angle_deg == 90
     explicit = build_request(method, "tray", {"name": "other", "angle_deg": 1})
     assert explicit.name == "other"
+
+
+def test_do_command_wraps_sdk_payload_and_keeps_explicit_command():
+    _load_builtin_descriptors()
+    service = Default().FindServiceByName("viam.service.generic.v1.GenericService")
+    method = _find_method(service, "DoCommand")
+
+    wrapped = build_request(method, "navigation", {"command": "navigate_to_location", "name": "dock_test"})
+    assert wrapped.name == "navigation"
+    assert MessageToDict(wrapped.command) == {"command": "navigate_to_location", "name": "dock_test"}
+
+    raw = build_request(method, "orders", {"command": {"query": "next_delivery_order"}})
+    assert raw.name == "orders"
+    assert MessageToDict(raw.command) == {"query": "next_delivery_order"}
+
+    explicit = build_request(method, "orders", {"name": "other", "command": {"query": "cup"}})
+    assert explicit.name == "other"
+    assert MessageToDict(explicit.command) == {"query": "cup"}
 
 
 def test_do_command_unwraps_result():
