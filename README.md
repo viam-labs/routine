@@ -15,9 +15,84 @@ A full coffee-delivery config is in [examples/coffee_delivery.json](examples/cof
 | `retry` | `1s`, max `30s` | Backoff for `retry_step`. Durations look like `500ms`, `10s`, `3m`, `1h`. |
 | `heartbeat` | off | Status report that runs on its own timer. |
 
-`on_dependency_error` may be set on the routine, on a mode, or on a step. The step wins, then the mode, then the routine.
+### Modes
 
-A mode with no `then` stops the routine after its last step. The same is true of `on_cancel`.
+A mode is an ordered list of steps. It may also have `then`, `pass`, `on_cancel`, and `on_dependency_error`.
+
+Steps run one after another. The next step starts when the current one returns. A call with `"wait": false` is the exception: it runs in the background until the mode changes.
+
+A returned call means the RPC finished. Some methods, such as navigation `navigate_to_location` and docking `Start`, return as soon as they accept the goal. Follow them with an `until` step when the routine should wait until the action itself is done.
+
+A step is a call, an `until`, or a `sleep`. `sleep` only waits. It cannot set `then`, `pass`, or `on_dependency_error`.
+
+### then
+
+`then` names the mode to enter next.
+
+On a step, `then` runs as soon as that step finishes and skips every step after it. On a mode, `then` runs only after every step has finished without its own `then`.
+
+A mode with no `then` stops the routine. It does not repeat. The same is true of `on_cancel` when that block has no `then`.
+
+### pass
+
+`pass` is the variable set handed to the mode named by `then`. It replaces that mode's variables. Values from the current mode are not kept unless `pass` copies them.
+
+The step's `pass` is used when that step's `then` runs. The mode's `pass` is used when the mode's `then` runs. If `then` is set and `pass` is omitted, the next mode starts with no variables.
+
+`on_cancel`'s own `then` also starts the next mode with no variables. A step inside `on_cancel` can still pass values when that step has its own `then`.
+
+```json
+"pass": { "order": { "from": "order" } }
+```
+
+`{"from": "order.id"}` copies a value from the current variables, the latest `result`, or `status`. `{"literal": {"from": "keep this object"}}` passes a value that itself has a `from` key.
+
+In the delivery example, pickup's `pass` copies the existing `order` variable. The last pickup step moves the tray, so `result` at the end of the mode is that move, not the order.
+
+### on_cancel
+
+`on_cancel` is a property of the mode, next to `steps`. It runs when:
+
+- the routine receives the `cancel` command
+- an `until` step's `cancel_when` becomes true
+- an `until` step reaches its `timeout`
+
+`stop` does not run `on_cancel`.
+
+```json
+"on_cancel": {
+  "steps": [
+    {
+      "resource": "navigation",
+      "method": "DoCommand",
+      "request": { "command": "cancel" }
+    },
+    {
+      "resource": "docking",
+      "method": "Stop",
+      "request": {}
+    }
+  ],
+  "then": "idle"
+}
+```
+
+Without `then`, the routine stops after those steps. With no `on_cancel` block at all, `cancel`, `cancel_when`, and an `until` timeout stop the routine immediately. `last_error` is `cancelled`, `cancel condition met`, or `until timed out`.
+
+### on_dependency_error
+
+`on_dependency_error` chooses what happens when a resource call fails, including a call step's `timeout`. An `until` timeout and `cancel_when` are cancellations, so they run `on_cancel` instead.
+
+| Value | Effect |
+| --- | --- |
+| `retry_step` | Retry that call with exponential backoff. An `until` step keeps polling. Default. |
+| `restart_mode` | Enter the current mode again from its first step, with the same variables. |
+| `start_mode` | Enter `start_mode` with no variables. |
+| `stop` | Stop the routine and set `state` to `error`. `last_error` is the failure. |
+
+Set it on the routine, on a mode, or on a call or `until` step. The step wins, then the mode, then the routine. A step inside `on_cancel` uses that same order against the mode it belongs to.
+
+`retry` sets the backoff for `retry_step`: `initial` defaults to `1s` and `max` defaults to `30s`. Each retry waits twice as long, up to `max`.
 
 ### Call step
 
@@ -72,14 +147,6 @@ The routine waits after the previous step returns, then runs the next step. Stop
 
 The method is polled immediately, then every `every`, until `when` is true. `cancel_when` or `timeout` runs the mode's `on_cancel` block. For an until step, `result` is the last poll.
 
-### Variables
-
-`{"from": "order.id"}` copies a value from the current variables, the latest `result`, or `status`. `pass` replaces the variable set for the next mode. Variables are not kept automatically, so a mode that needs an earlier value has to pass it on.
-
-In the delivery example, pickup's `pass` copies the existing `order` variable. The last pickup step moves the tray, so `result` at the end of the mode is that move, not the order.
-
-`{"literal": {"from": "keep this object"}}` passes a value that itself has a `from` key.
-
 ### Expressions
 
 `when` and `cancel_when` accept comparisons (`== != < <= > >=`), `and`, `or`, `not`, parentheses, numbers, quoted strings, `true`, `false`, and `null`. A bare word that is not a variable is a string, so `result.status == handed_over` matches the string `handed_over`. Dotted fields and indexes (`result.items[0].name`) are supported.
@@ -127,12 +194,12 @@ A step can call a module API that is not built into the Viam SDK, such as [actio
 | --- | --- | --- |
 | `status` | | The status object nested under `status`. |
 | `GetStatus` | | That same object at the top level. `get_status` is the same command. |
-
-The service method `GetStatus` returns that object directly. That is what the machine control tab calls. A heartbeat reads the same object as `status`. Its fields are `state`, `mode`, `step_index`, `step_count`, `step_kind`, `vars`, `last_error`, `result`, `mode_entered_at`, and `updated_at`. `result` is the latest response, including each `until` poll.
 | `start` | `mode`, `vars` | Start `mode`, or `start_mode`. |
 | `stop` | | Stop without running `on_cancel`. |
 | `set_mode` | `mode`, `vars` | Jump to a mode. |
 | `cancel` | | Run the current mode's `on_cancel`. |
+
+The service method `GetStatus` returns that object directly. That is what the machine control tab calls. A heartbeat reads the same object as `status`. Its fields are `state`, `mode`, `step_index`, `step_count`, `step_kind`, `vars`, `last_error`, `result`, `mode_entered_at`, and `updated_at`. `result` is the latest response, including each `until` poll.
 
 ## Development
 
