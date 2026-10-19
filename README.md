@@ -2,7 +2,32 @@
 
 `viam-labs:service:routine` is a [generic service](https://docs.viam.com/operate/reference/services/generic/) that runs one or more state machines, called modes. Each step calls a method on another resource already configured on the machine. The routine reads the response, polls with `until`, passes variables into the next mode, and can clean up with `on_cancel`.
 
-A full coffee-delivery config is in [examples/coffee_delivery.json](examples/coffee_delivery.json).
+This routine extends a switch, waits five seconds, retracts it, and stops:
+
+```json
+{
+  "start_mode": "pulse",
+  "modes": {
+    "pulse": {
+      "steps": [
+        {
+          "resource": "tray-actuator-extend",
+          "method": "SetPosition",
+          "request": { "position": 1 }
+        },
+        { "sleep": "5s" },
+        {
+          "resource": "tray-actuator-extend",
+          "method": "SetPosition",
+          "request": { "position": 0 }
+        }
+      ]
+    }
+  }
+}
+```
+
+`start_mode` names the mode to run. Steps run in order, and a mode with no `then` stops after its last step. A full coffee-delivery config is in [examples/coffee_delivery.json](examples/coffee_delivery.json).
 
 ## Configure
 
