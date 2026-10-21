@@ -14,7 +14,7 @@ def test_example_config_parses():
     assert cfg.on_dependency_error == "retry_step"
     assert cfg.modes["pickup"].on_cancel is not None
     assert cfg.modes["pickup"].on_cancel.then == "idle"
-    assert cfg.modes["pickup"].pass_vars == {"order": {"from": "order"}}
+    assert cfg.modes["pickup"].pass_vars == {"order": "${order}"}
     assert "delivery_nav" in cfg.resources()
     assert cfg.heartbeat is None
 

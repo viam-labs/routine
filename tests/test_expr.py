@@ -41,3 +41,28 @@ def test_syntax_error():
     except ExprError:
         return
     raise AssertionError("expected ExprError")
+
+
+def test_split_if_then_else():
+    scope = {"result": {"for": "eliot_office"}}
+    assert evaluate(parse_expr("split(result.for, '_')[0]"), scope) == "eliot"
+    assert evaluate(parse_expr("split(result.for, '_')[1]"), scope) == "office"
+    assert (
+        evaluate(
+            parse_expr(
+                "if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"
+            ),
+            scope,
+        )
+        == "office"
+    )
+    scope = {"result": {"for": "eliot"}}
+    assert (
+        evaluate(
+            parse_expr(
+                "if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"
+            ),
+            scope,
+        )
+        == "eliot"
+    )

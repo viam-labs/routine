@@ -67,10 +67,30 @@ The step's `pass` is used when that step's `then` runs. The mode's `pass` is use
 `on_cancel`'s own `then` also starts the next mode with no variables. A step inside `on_cancel` can still pass values when that step has its own `then`.
 
 ```json
-"pass": { "order": { "from": "order" } }
+"pass": { "order": "${order}" }
 ```
 
-`{"from": "order.id"}` copies a value from the current variables, the latest `result`, or `status`. `{"literal": {"from": "keep this object"}}` passes a value that itself has a `from` key.
+Any string that contains `${...}` is filled in from the current variables, the latest `result`, or `status`. A string that is only `${...}` keeps the value as-is, including objects. Any other text builds a string, and each placeholder is stringified.
+
+```json
+{
+  "resource": "tts",
+  "method": "DoCommand",
+  "request": {
+    "text": "Coffee for ${result.for}"
+  }
+}
+```
+
+Inside `${...}` you can use paths, `split(value, sep)`, indexes, and `if … then … else …`:
+
+```json
+"text": "Coffee for ${if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}"
+```
+
+That uses the part after `_` when present, otherwise the whole value. A missing index is false.
+
+`{"literal": "Coffee for ${result.for}"}` keeps that text as written, with no substitution.
 
 In the delivery example, pickup's `pass` copies the existing `order` variable. The last pickup step moves the tray, so `result` at the end of the mode is that move, not the order.
 
@@ -129,7 +149,7 @@ Set it on the routine, on a mode, or on a call or `until` step. The step wins, t
   "wait": false,
   "timeout": "5s",
   "then": "next_mode",
-  "pass": { "order": { "from": "order" } },
+  "pass": { "order": "${order}" },
   "on_dependency_error": "stop"
 }
 ```
@@ -160,13 +180,13 @@ The routine waits after the previous step returns, then runs the next step. Stop
     "every": "5s",
     "resource": "coffee_maker:orders",
     "method": "DoCommand",
-    "request": { "order_status": { "order_id": { "from": "order.id" } } },
+    "request": { "order_status": { "order_id": "${order.id}" } },
     "when": "result.status == handed_over",
     "cancel_when": "result.status == canceled",
     "timeout": "3m"
   },
   "then": "delivering",
-  "pass": { "order": { "from": "result.order" } }
+  "pass": { "order": "${result.order}" }
 }
 ```
 
@@ -183,7 +203,7 @@ The method is polled immediately, then every `every`, until `when` is true. `can
   "every_secs": 5,
   "resource": "fleet_status",
   "method": "DoCommand",
-  "request": { "mode": { "from": "status.mode" }, "state": { "from": "status.state" } }
+  "request": { "mode": "${status.mode}", "state": "${status.state}" }
 }
 ```
 

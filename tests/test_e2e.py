@@ -77,7 +77,7 @@ def _coffee_config() -> dict[str, Any]:
                             "when": "result.available",
                         },
                         "then": "pickup",
-                        "pass": {"order": {"from": "result.order"}},
+                        "pass": {"order": "${result.order}"},
                     },
                 ]
             },
@@ -92,7 +92,7 @@ def _coffee_config() -> dict[str, Any]:
                     {
                         "resource": "coffee_maker:orders",
                         "method": "DoCommand",
-                        "request": {"command": {"ready_for_order": {"order_id": {"from": "order.id"}}}},
+                        "request": {"command": {"ready_for_order": {"order_id": "${order.id}"}}},
                     },
                     {
                         "until": {
@@ -100,7 +100,7 @@ def _coffee_config() -> dict[str, Any]:
                             "timeout": "300ms",
                             "resource": "coffee_maker:orders",
                             "method": "DoCommand",
-                            "request": {"command": {"order_status": {"order_id": {"from": "order.id"}}}},
+                            "request": {"command": {"order_status": {"order_id": "${order.id}"}}},
                             "when": "result.status == handed_over",
                             "cancel_when": "result.status == canceled",
                         }
@@ -108,7 +108,7 @@ def _coffee_config() -> dict[str, Any]:
                     {"resource": "tray", "method": "Move", "request": {"angle_deg": 0}},
                 ],
                 "then": "delivering",
-                "pass": {"order": {"from": "order"}},
+                "pass": {"order": "${order}"},
                 "on_cancel": {
                     "steps": [{"resource": "tray", "method": "Move", "request": {"angle_deg": 0}}],
                     "then": "idle",
@@ -119,7 +119,7 @@ def _coffee_config() -> dict[str, Any]:
                     {
                         "resource": "delivery_nav",
                         "method": "NavigateToLocation",
-                        "request": {"location_name": {"from": "order.destination"}},
+                        "request": {"location_name": "${order.destination}"},
                     },
                     {"resource": "speaker", "method": "Play", "request": {"sound": "delivery_arrived"}},
                     {
@@ -487,7 +487,7 @@ async def test_heartbeat_reports_while_running_and_stopped():
             "every_secs": 0.05,
             "resource": "fleet_status",
             "method": "DoCommand",
-            "request": {"command": {"mode": {"from": "status.mode"}, "state": {"from": "status.state"}}},
+            "request": {"command": {"mode": "${status.mode}", "state": "${status.state}"}},
         },
         "modes": {
             "watch": {

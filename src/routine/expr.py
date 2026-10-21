@@ -1,8 +1,9 @@
-"""A small expression language for ``when`` and ``cancel_when``.
+"""A small expression language for ``when``, ``cancel_when``, and ``${...}``.
 
 Never calls ``eval``. Supports dotted paths, list indexes, comparisons,
-``and`` / ``or`` / ``not``, parentheses, and literals. A bare word that is not
-a scope name is a string, so ``result.status == handed_over`` works.
+``and`` / ``or`` / ``not``, parentheses, ``if`` / ``then`` / ``else``,
+``split(value, sep)``, and literals. A bare word that is not a scope name is a
+string, so ``result.status == handed_over`` works.
 """
 
 from __future__ import annotations
@@ -38,29 +39,58 @@ class Binary:
     right: "Node"
 
 
-Node = Union[Literal, Path, Unary, Binary]
+@dataclass(frozen=True)
+class Call:
+    name: str
+    args: tuple["Node", ...]
+
+
+@dataclass(frozen=True)
+class Index:
+    value: "Node"
+    index: int
+
+
+@dataclass(frozen=True)
+class If:
+    condition: "Node"
+    then_value: "Node"
+    else_value: "Node"
+
+
+Node = Union[Literal, Path, Unary, Binary, Call, Index, If]
 
 _KEYWORDS = {"true": True, "false": False, "null": None}
+_RESERVED = {"and", "or", "not", "if", "then", "else"}
+_FUNCTIONS = {"split"}
 _CMP = {"==", "!=", "<", "<=", ">", ">="}
 
 
 def parse_expr(source: str) -> Node:
     parser = _Parser(_tokenize(source))
-    node = parser.parse_or()
+    node = parser.parse_if()
     if parser.peek() is not None:
         raise ExprError(f"unexpected {parser.peek()!r} in expression {source!r}")
     return node
 
 
-def evaluate(node: Node, scope: dict[str, Any]) -> Any:
+def evaluate(node: Node, scope: dict[str, Any], *, strict_paths: bool = False) -> Any:
     if isinstance(node, Literal):
         return node.value
     if isinstance(node, Path):
-        return _lookup_path(node.parts, scope)
+        return _lookup_path(node.parts, scope, strict=strict_paths)
     if isinstance(node, Unary):
-        return not _truthy(evaluate(node.value, scope))
-    left = evaluate(node.left, scope)
-    right = evaluate(node.right, scope)
+        return not _truthy(evaluate(node.value, scope, strict_paths=strict_paths))
+    if isinstance(node, Call):
+        return _call(node, scope, strict_paths=strict_paths)
+    if isinstance(node, Index):
+        return _index(evaluate(node.value, scope, strict_paths=strict_paths), node.index)
+    if isinstance(node, If):
+        if _truthy(evaluate(node.condition, scope, strict_paths=strict_paths)):
+            return evaluate(node.then_value, scope, strict_paths=strict_paths)
+        return evaluate(node.else_value, scope, strict_paths=strict_paths)
+    left = evaluate(node.left, scope, strict_paths=strict_paths)
+    right = evaluate(node.right, scope, strict_paths=strict_paths)
     if node.op == "and":
         return _truthy(left) and _truthy(right)
     if node.op == "or":
@@ -91,11 +121,33 @@ def _truthy(value: Any) -> bool:
     return bool(value)
 
 
-def _lookup_path(parts: Sequence[Union[str, int]], scope: dict[str, Any]) -> Any:
+def _call(node: Call, scope: dict[str, Any], *, strict_paths: bool) -> Any:
+    if node.name == "split":
+        if len(node.args) != 2:
+            raise ExprError("split takes a value and a separator")
+        value = evaluate(node.args[0], scope, strict_paths=strict_paths)
+        sep = evaluate(node.args[1], scope, strict_paths=strict_paths)
+        if not isinstance(value, str):
+            raise ExprError(f"split value must be a string, got {value!r}")
+        if not isinstance(sep, str):
+            raise ExprError(f"split separator must be a string, got {sep!r}")
+        return value.split(sep)
+    raise ExprError(f"unknown function {node.name!r}")
+
+
+def _index(value: Any, index: int) -> Any:
+    if not isinstance(value, list) or index < 0 or index >= len(value):
+        return None
+    return value[index]
+
+
+def _lookup_path(parts: Sequence[Union[str, int]], scope: dict[str, Any], *, strict: bool = False) -> Any:
     first = parts[0]
     if not isinstance(first, str):
         raise ExprError("invalid path")
     if first not in scope:
+        if strict:
+            raise ExprError(f"{first!r} is not in scope")
         if len(parts) == 1:
             return first
         return None
@@ -178,7 +230,7 @@ def _tokenize(source: str) -> list[_Tok]:
                 i += len(op)
                 break
         else:
-            if ch in "<>()[].":
+            if ch in "<>()[].,":
                 tokens.append(_Tok(ch, ch))
                 i += 1
                 continue
@@ -203,6 +255,17 @@ class _Parser:
         self.i += 1
         return tok
 
+    def parse_if(self) -> Node:
+        if self._word("if"):
+            condition = self.parse_or()
+            if not self._word("then"):
+                raise ExprError("expected 'then'")
+            then_value = self.parse_if()
+            if not self._word("else"):
+                raise ExprError("expected 'else'")
+            return If(condition, then_value, self.parse_if())
+        return self.parse_or()
+
     def parse_or(self) -> Node:
         node = self.parse_and()
         while self._word("or"):
@@ -221,12 +284,27 @@ class _Parser:
         return self.parse_cmp()
 
     def parse_cmp(self) -> Node:
-        node = self.parse_primary()
+        node = self.parse_postfix()
         tok = self.peek()
         if tok is not None and (tok.kind == "op" or tok.kind in "<>"):
             self.pop()
-            return Binary(str(tok.value), node, self.parse_primary())
+            return Binary(str(tok.value), node, self.parse_postfix())
         return node
+
+    def parse_postfix(self) -> Node:
+        node = self.parse_primary()
+        while True:
+            tok = self.peek()
+            if tok is None or tok.kind != "[":
+                return node
+            self.pop()
+            idx = self.pop()
+            if idx.kind != "number" or not isinstance(idx.value, int):
+                raise ExprError("index must be an integer")
+            close = self.pop()
+            if close.kind != "]":
+                raise ExprError("expected ']'")
+            node = Index(node, idx.value)
 
     def parse_primary(self) -> Node:
         tok = self.peek()
@@ -234,7 +312,7 @@ class _Parser:
             raise ExprError("unexpected end of expression")
         if tok.kind == "(":
             self.pop()
-            node = self.parse_or()
+            node = self.parse_if()
             close = self.pop()
             if close.kind != ")":
                 raise ExprError("expected ')'")
@@ -246,11 +324,31 @@ class _Parser:
             self.pop()
             return Literal(tok.value)
         if tok.kind == "word":
+            if tok.value in _FUNCTIONS and self._next_is("("):
+                return self.parse_call()
             if tok.value in _KEYWORDS and not self._path_continues():
                 self.pop()
                 return Literal(_KEYWORDS[tok.value])
             return Path(tuple(self.parse_path()))
         raise ExprError(f"unexpected {tok.value!r}")
+
+    def parse_call(self) -> Node:
+        name = self.pop()
+        if name.kind != "word":
+            raise ExprError("expected a function name")
+        open_paren = self.pop()
+        if open_paren.kind != "(":
+            raise ExprError("expected '('")
+        args: list[Node] = []
+        if self.peek() is not None and self.peek().kind != ")":
+            args.append(self.parse_if())
+            while self.peek() is not None and self.peek().kind == ",":
+                self.pop()
+                args.append(self.parse_if())
+        close = self.pop()
+        if close.kind != ")":
+            raise ExprError("expected ')'")
+        return Call(str(name.value), tuple(args))
 
     def _path_continues(self) -> bool:
         if self.i + 1 >= len(self.tokens):
@@ -258,11 +356,16 @@ class _Parser:
         nxt = self.tokens[self.i + 1]
         return nxt.kind in ".["
 
+    def _next_is(self, kind: str) -> bool:
+        if self.i + 1 >= len(self.tokens):
+            return False
+        return self.tokens[self.i + 1].kind == kind
+
     def parse_path(self) -> list[Union[str, int]]:
         tok = self.pop()
         if tok.kind != "word":
             raise ExprError(f"expected a name, got {tok.value!r}")
-        if tok.value in ("and", "or", "not"):
+        if tok.value in _RESERVED:
             raise ExprError(f"unexpected {tok.value!r}")
         parts: list[Union[str, int]] = [tok.value]
         while True:
