@@ -44,6 +44,51 @@ def test_policy_precedence_and_heartbeat_default():
     assert cfg.heartbeat.every_secs == 5
 
 
+def test_then_template_is_allowed():
+    cfg = parse_config(
+        {
+            "start_mode": "dock",
+            "modes": {
+                "dock": {
+                    "steps": [
+                        {
+                            "resource": "coffee",
+                            "method": "DoCommand",
+                            "then": "${if result.available then wait_for_handover else idle}",
+                        }
+                    ]
+                },
+                "wait_for_handover": {"steps": []},
+                "idle": {"steps": []},
+            },
+        }
+    )
+    assert cfg.modes["dock"].steps[0].then == (
+        "${if result.available then wait_for_handover else idle}"
+    )
+
+
+def test_then_template_must_be_a_single_expression():
+    with pytest.raises(ConfigError):
+        parse_config(
+            {
+                "start_mode": "dock",
+                "modes": {
+                    "dock": {
+                        "steps": [
+                            {
+                                "resource": "coffee",
+                                "method": "DoCommand",
+                                "then": "go ${result.available}",
+                            }
+                        ]
+                    },
+                    "idle": {"steps": []},
+                },
+            }
+        )
+
+
 def test_sleep_step_is_not_a_resource_dependency():
     cfg = parse_config(
         {

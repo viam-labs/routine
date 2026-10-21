@@ -404,7 +404,12 @@ def _optional_object(value: Any, where: str) -> Optional[dict[str, Any]]:
 
 def _check_targets(mode: Mode, modes: dict[str, Mode]) -> None:
     def check(target: Optional[str], where: str) -> None:
-        if target is not None and target not in modes:
+        if target is None:
+            return
+        if "${" in target:
+            _check_then_template(target, where)
+            return
+        if target not in modes:
             raise ConfigError(f"{where} points at unknown mode {target!r}")
 
     check(mode.then, f"mode {mode.name!r} then")
@@ -414,6 +419,20 @@ def _check_targets(mode: Mode, modes: dict[str, Mode]) -> None:
         check(mode.on_cancel.then, f"mode {mode.name!r} on_cancel then")
         for index, step in enumerate(mode.on_cancel.steps):
             check(step.then, f"mode {mode.name!r} on_cancel step {index} then")
+
+
+def _check_then_template(target: str, where: str) -> None:
+    from routine.expr import ExprError, parse_expr
+    from routine.refs import RefError, template_expression
+
+    try:
+        source = template_expression(target)
+    except RefError as exc:
+        raise ConfigError(f"{where} template must be a single ${{...}} expression") from exc
+    try:
+        parse_expr(source)
+    except ExprError as exc:
+        raise ConfigError(f"{where} is not a valid expression: {exc}") from exc
 
 
 def _all_steps(mode: Mode) -> list[Step]:

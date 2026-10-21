@@ -540,6 +540,45 @@ async def test_sleep_waits_between_calls():
 
 
 @pytest.mark.asyncio
+async def test_then_expression_chooses_next_mode():
+    coffee = ScriptedGeneric("coffee")
+    coffee.respond = lambda _command: {"available": True, "order_id": "ord-1"}
+    marker = ScriptedGeneric("marker")
+    config = {
+        "start_mode": "dock",
+        "modes": {
+            "dock": {
+                "steps": [
+                    {
+                        "resource": "coffee",
+                        "method": "DoCommand",
+                        "request": {"command": {"delivery_machine_ready": True}},
+                        "then": "${if result.available then wait_for_handover else idle}",
+                        "pass": {"order": "${result}"},
+                    }
+                ]
+            },
+            "wait_for_handover": {
+                "steps": [
+                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "handover"}}},
+                ]
+            },
+            "idle": {
+                "steps": [
+                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "idle"}}},
+                ]
+            },
+        },
+    }
+    lab = await start_lab(config, [coffee, marker])
+    try:
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["mode"] == "wait_for_handover")
+        assert marker.calls == [{"op": "handover"}]
+    finally:
+        await lab.close()
+
+
+@pytest.mark.asyncio
 async def test_status_includes_latest_poll_result():
     dock = ScriptedGeneric("docking")
     dock.respond = lambda _command: {"running": True}

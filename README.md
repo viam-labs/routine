@@ -58,6 +58,12 @@ On a step, `then` runs as soon as that step finishes and skips every step after 
 
 A mode with no `then` stops the routine. It does not repeat. The same is true of `on_cancel` when that block has no `then`.
 
+`then` may be a fixed mode name or a single `${...}` expression evaluated after the step returns. Bare words in that expression are mode names:
+
+```json
+"then": "${if result.available then wait_for_handover else idle}"
+```
+
 ### pass
 
 `pass` is the variable set handed to the mode named by `then`. It replaces that mode's variables. Values from the current mode are not kept unless `pass` copies them.

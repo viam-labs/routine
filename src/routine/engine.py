@@ -12,7 +12,7 @@ from viam.logging import getLogger
 from routine.config import CallStep, Mode, RoutineConfig, SleepStep, Step, UntilStep, effective_policy
 from routine.expr import ExprError, is_true
 from routine.invoker import Invoker
-from routine.refs import RefError, resolve
+from routine.refs import RefError, resolve, resolve_mode_name
 
 LOGGER = getLogger(__name__)
 
@@ -140,15 +140,17 @@ class Engine:
                 if step.then:
                     try:
                         passed = self._passed(step, variables, result, mode)
+                        target = self._then_target(step.then, variables, result)
                     except StepFailure as exc:
                         return await self._apply_policy(exc, mode_name, variables)
-                    return _Goto(step.then, passed)
+                    return _Goto(target, passed)
             if mode.then:
                 try:
                     passed = self._passed_mode(mode, variables, result)
+                    target = self._then_target(mode.then, variables, result)
                 except StepFailure as exc:
                     return await self._apply_policy(exc, mode_name, variables)
-                return _Goto(mode.then, passed)
+                return _Goto(target, passed)
             return None
         finally:
             await self._cancel_background()
@@ -182,11 +184,16 @@ class Engine:
             if step.then:
                 try:
                     passed = self._passed(step, variables, result, mode)
+                    target = self._then_target(step.then, variables, result)
                 except StepFailure as exc:
                     return await self._apply_policy(exc, mode.name, variables)
-                return _Goto(step.then, passed)
+                return _Goto(target, passed)
         if cancel.then:
-            return _Goto(cancel.then, {})
+            try:
+                target = self._then_target(cancel.then, variables, result)
+            except StepFailure as exc:
+                return await self._apply_policy(exc, mode.name, variables)
+            return _Goto(target, {})
         return None
 
     async def _apply_policy(self, failure: StepFailure, mode_name: str, variables: dict[str, Any]) -> Optional[_Goto]:
@@ -318,6 +325,15 @@ class Engine:
         if not isinstance(resolved, dict):
             raise StepFailure(effective_policy(step, mode, self.config), RefError("request must resolve to an object"))
         return resolved
+
+    def _then_target(self, then: str, variables: dict[str, Any], result: Any) -> str:
+        try:
+            target = resolve_mode_name(then, _scope(variables, result, self.snapshot()))
+        except RefError as exc:
+            raise StepFailure(self.config.on_dependency_error, exc) from exc
+        if target not in self.config.modes:
+            raise StepFailure(self.config.on_dependency_error, RefError(f"unknown mode {target!r}"))
+        return target
 
     def _passed(self, step: Step, variables: dict[str, Any], result: Any, mode: Mode) -> dict[str, Any]:
         if not step.pass_vars:
