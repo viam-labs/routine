@@ -33,40 +33,76 @@ This routine extends a switch, waits five seconds, retracts it, and stops:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `modes` | required | Named modes. Each has `steps`, and may have `then`, `pass`, `on_cancel`, `on_dependency_error`, and `report_as`. |
-| `start_mode` | `idle` | Mode entered on start. Must name a configured mode. |
-| `auto_start` | `true` | Start that mode when the service configures. |
+| `modes` | required | Named modes. Each has `steps`, and may have `then`, `pass`, `on_cancel`, `on_dependency_error`, `report_status`, and `start`. |
+| `start_mode` | `idle` | Foreground mode entered on start. Must name a configured mode. |
+| `auto_start` | `true` | Start that foreground mode when the service configures. |
+| `background` | off | One mode that runs continuously beside the foreground. |
 | `on_dependency_error` | `retry_step` | What to do when a resource call fails. `retry_step`, `restart_mode`, `start_mode`, or `stop`. |
 | `retry` | `1s`, max `30s` | Backoff for `retry_step`. Durations look like `500ms`, `10s`, `3m`, `1h`. |
 | `heartbeat` | off | Status report that runs on its own timer. |
 
 ### Modes
 
-A mode is an ordered list of steps. It may also have `then`, `pass`, `on_cancel`, `on_dependency_error`, and `report_as`.
+A mode is an ordered list of steps. It may also have `then`, `pass`, `on_cancel`, `on_dependency_error`, `report_status`, and `start`.
 
 Steps run one after another. The next step starts when the current one returns. A call with `"wait": false` is the exception: it runs in the background until the mode changes.
 
-`report_as: "stopped"` keeps the mode running (so an `until` can still poll) while `GetStatus` and the heartbeat report `state` as `stopped`. Use that for a standby gate that should not look like an active delivery:
+### Background mode
+
+`background` names one mode that starts with the service and keeps running while foreground modes come and go. Only one background mode runs at a time; its `then` transitions stay in the background runner.
+
+`report_status: "stopped"` on a background mode forces `GetStatus` and the heartbeat to report `stopped`, and stops the foreground mode when that background mode is entered. Foreground `start` / `set_mode` are refused while held. When the background leaves that mode, status is released.
+
+`start` on a background mode starts that foreground mode when the background mode's own `then` runs (for example after unplugging).
 
 ```json
-"idle": {
-  "report_as": "stopped",
-  "steps": [
-    {
-      "until": {
-        "every": "5s",
-        "resource": "power",
-        "method": "GetReadings",
-        "request": {},
-        "when": "result.readings.is_charging == false"
+"background": "charge_check",
+"start_mode": "ready",
+"modes": {
+  "charge_check": {
+    "steps": [
+      {
+        "until": {
+          "every": "5s",
+          "resource": "power",
+          "method": "GetReadings",
+          "request": {},
+          "when": "result.readings.is_charging == true"
+        },
+        "then": "charge_hold"
+      }
+    ]
+  },
+  "charge_hold": {
+    "report_status": "stopped",
+    "steps": [
+      {
+        "resource": "navigation",
+        "method": "DoCommand",
+        "request": { "command": "cancel" }
       },
-      "then": "ready"
-    }
-  ]
+      {
+        "resource": "avoidance-base",
+        "method": "Stop",
+        "request": {}
+      },
+      {
+        "until": {
+          "every": "5s",
+          "resource": "power",
+          "method": "GetReadings",
+          "request": {},
+          "when": "result.readings.is_charging == false"
+        }
+      }
+    ],
+    "then": "charge_check",
+    "start": "ready"
+  }
 }
 ```
 
-A returned call means the RPC finished. Some methods, such as navigation `navigate_to_location` and docking `Start`, return as soon as they accept the goal. Follow them with an `until` step when the routine should wait until the action itself is done.
+Status includes `background_mode` for the current background mode. A returned call means the RPC finished. Some methods, such as navigation `navigate_to_location` and docking `Start`, return as soon as they accept the goal. Follow them with an `until` step when the routine should wait until the action itself is done.
 
 A step is a call, an `until`, or a `sleep`. `sleep` only waits. It cannot set `then`, `pass`, or `on_dependency_error`.
 

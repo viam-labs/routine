@@ -540,15 +540,17 @@ async def test_sleep_waits_between_calls():
 
 
 @pytest.mark.asyncio
-async def test_report_as_stopped_while_until_still_runs():
+async def test_background_hold_stops_foreground_and_resumes():
     power = ScriptedGeneric("power")
-    power.respond = lambda _command: {"readings": {"is_charging": True}}
+    power.respond = lambda _command: {"readings": {"is_charging": False}}
     marker = ScriptedGeneric("marker")
+    base = ScriptedGeneric("base")
     config = {
-        "start_mode": "idle",
+        "background": "charge_check",
+        "start_mode": "ready",
+        "auto_start": True,
         "modes": {
-            "idle": {
-                "report_as": "stopped",
+            "charge_check": {
                 "steps": [
                     {
                         "until": {
@@ -556,31 +558,63 @@ async def test_report_as_stopped_while_until_still_runs():
                             "resource": "power",
                             "method": "DoCommand",
                             "request": {"command": {"query": "charge"}},
-                            "when": "result.readings.is_charging == false",
+                            "when": "result.readings.is_charging == true",
                         },
-                        "then": "ready",
+                        "then": "charge_hold",
                     }
+                ]
+            },
+            "charge_hold": {
+                "report_status": "stopped",
+                "steps": [
+                    {"resource": "base", "method": "DoCommand", "request": {"command": {"op": "stop"}}},
+                    {
+                        "until": {
+                            "every": "50ms",
+                            "resource": "power",
+                            "method": "DoCommand",
+                            "request": {"command": {"query": "charge"}},
+                            "when": "result.readings.is_charging == false",
+                        }
+                    },
                 ],
+                "then": "charge_check",
+                "start": "ready",
             },
             "ready": {
                 "steps": [
-                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "go"}}},
+                    {
+                        "until": {
+                            "every": "1h",
+                            "resource": "marker",
+                            "method": "DoCommand",
+                            "request": {"command": {"op": "work"}},
+                            "when": "result.done == true",
+                        }
+                    }
                 ]
             },
         },
     }
-    lab = await start_lab(config, [power, marker])
+    lab = await start_lab(config, [power, marker, base])
     try:
-        status = await _wait(
+        await _wait(lab.service, lambda current: current["mode"] == "ready" and current["state"] == "running")
+        power.respond = lambda _command: {"readings": {"is_charging": True}}
+        await _wait(
             lab.service,
             lambda current: current["state"] == "stopped"
-            and current["mode"] == "idle"
-            and current.get("result") == {"readings": {"is_charging": True}},
+            and current["background_mode"] == "charge_hold"
+            and {"op": "stop"} in base.calls,
         )
-        assert status["step_kind"] == "until"
+        with pytest.raises(Exception):
+            await lab.service.do_command({"command": "start", "mode": "ready"})
         power.respond = lambda _command: {"readings": {"is_charging": False}}
-        await _wait(lab.service, lambda current: current["state"] == "stopped" and current["mode"] == "ready")
-        assert marker.calls == [{"op": "go"}]
+        await _wait(
+            lab.service,
+            lambda current: current["state"] == "running"
+            and current["mode"] == "ready"
+            and current["background_mode"] == "charge_check",
+        )
     finally:
         await lab.close()
 

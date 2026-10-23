@@ -83,7 +83,8 @@ class Mode:
     pass_vars: Optional[dict[str, Any]] = None
     on_cancel: Optional[OnCancel] = None
     on_dependency_error: Optional[str] = None
-    report_as: Optional[str] = None
+    report_status: Optional[str] = None
+    start: Optional[str] = None
 
 
 @dataclass
@@ -108,6 +109,7 @@ class RoutineConfig:
     on_dependency_error: str = "retry_step"
     retry: Retry = field(default_factory=Retry)
     heartbeat: Optional[Heartbeat] = None
+    background: Optional[str] = None
 
     def resources(self) -> list[str]:
         found: list[str] = []
@@ -140,6 +142,7 @@ def parse_config(raw: Any) -> RoutineConfig:
         "on_dependency_error",
         "retry",
         "heartbeat",
+        "background",
     }
     if unknown:
         raise ConfigError(f"unknown configuration fields: {', '.join(sorted(unknown))}")
@@ -153,12 +156,19 @@ def parse_config(raw: Any) -> RoutineConfig:
     auto_start = raw.get("auto_start", True)
     if not isinstance(auto_start, bool):
         raise ConfigError("auto_start must be a boolean")
+    background = raw.get("background")
+    if background is not None and (not isinstance(background, str) or not background):
+        raise ConfigError("background must be a mode name")
 
     modes = {name: _parse_mode(name, body) for name, body in raw["modes"].items()}
     if start_mode not in modes:
         raise ConfigError(f"start_mode {start_mode!r} is not a configured mode")
+    if background is not None and background not in modes:
+        raise ConfigError(f"background {background!r} is not a configured mode")
     for mode in modes.values():
         _check_targets(mode, modes)
+        if mode.start is not None and mode.start not in modes:
+            raise ConfigError(f"mode {mode.name!r} start points at unknown mode {mode.start!r}")
 
     return RoutineConfig(
         modes=modes,
@@ -167,6 +177,7 @@ def parse_config(raw: Any) -> RoutineConfig:
         on_dependency_error=policy,
         retry=_parse_retry(raw.get("retry")),
         heartbeat=_parse_heartbeat(raw.get("heartbeat")),
+        background=background,
     )
 
 
@@ -223,7 +234,15 @@ def _parse_mode(name: str, raw: Any) -> Mode:
         raise ConfigError("mode names must be non-empty strings")
     if not isinstance(raw, dict):
         raise ConfigError(f"mode {name!r} must be an object")
-    unknown = set(raw) - {"steps", "then", "pass", "on_cancel", "on_dependency_error", "report_as"}
+    unknown = set(raw) - {
+        "steps",
+        "then",
+        "pass",
+        "on_cancel",
+        "on_dependency_error",
+        "report_status",
+        "start",
+    }
     if unknown:
         raise ConfigError(f"mode {name!r} has unknown fields: {', '.join(sorted(unknown))}")
     steps_raw = raw.get("steps", [])
@@ -237,7 +256,8 @@ def _parse_mode(name: str, raw: Any) -> Mode:
         pass_vars=_optional_object(raw.get("pass"), f"{where} pass"),
         on_cancel=_parse_on_cancel(raw.get("on_cancel"), name),
         on_dependency_error=_optional_policy(raw.get("on_dependency_error"), f"{where} on_dependency_error"),
-        report_as=_optional_report_as(raw.get("report_as"), f"{where} report_as"),
+        report_status=_optional_report_status(raw.get("report_status"), f"{where} report_status"),
+        start=_optional_name(raw.get("start"), f"{where} start"),
     )
 
 
@@ -396,7 +416,7 @@ def _optional_name(value: Any, where: str) -> Optional[str]:
     return value
 
 
-def _optional_report_as(value: Any, where: str) -> Optional[str]:
+def _optional_report_status(value: Any, where: str) -> Optional[str]:
     if value is None:
         return None
     if value != "stopped":

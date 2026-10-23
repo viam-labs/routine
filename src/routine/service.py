@@ -135,6 +135,7 @@ class Routine(Generic, EasyResource):
             engine = Engine(cfg, invoker)
             self._engine = engine
             self._heartbeat = start_heartbeat(cfg.heartbeat, engine, invoker)
+            await engine.start_monitor()
             if cfg.auto_start and generation == self._generation:
                 await engine.start()
 
@@ -148,7 +149,7 @@ class Routine(Generic, EasyResource):
         engine = self._engine
         self._engine = None
         if engine is not None:
-            await engine.stop()
+            await engine.shutdown()
 
 
     async def _status(self) -> dict[str, Any]:
