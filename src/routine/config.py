@@ -83,6 +83,7 @@ class Mode:
     pass_vars: Optional[dict[str, Any]] = None
     on_cancel: Optional[OnCancel] = None
     on_dependency_error: Optional[str] = None
+    report_as: Optional[str] = None
 
 
 @dataclass
@@ -222,7 +223,7 @@ def _parse_mode(name: str, raw: Any) -> Mode:
         raise ConfigError("mode names must be non-empty strings")
     if not isinstance(raw, dict):
         raise ConfigError(f"mode {name!r} must be an object")
-    unknown = set(raw) - {"steps", "then", "pass", "on_cancel", "on_dependency_error"}
+    unknown = set(raw) - {"steps", "then", "pass", "on_cancel", "on_dependency_error", "report_as"}
     if unknown:
         raise ConfigError(f"mode {name!r} has unknown fields: {', '.join(sorted(unknown))}")
     steps_raw = raw.get("steps", [])
@@ -236,6 +237,7 @@ def _parse_mode(name: str, raw: Any) -> Mode:
         pass_vars=_optional_object(raw.get("pass"), f"{where} pass"),
         on_cancel=_parse_on_cancel(raw.get("on_cancel"), name),
         on_dependency_error=_optional_policy(raw.get("on_dependency_error"), f"{where} on_dependency_error"),
+        report_as=_optional_report_as(raw.get("report_as"), f"{where} report_as"),
     )
 
 
@@ -391,6 +393,14 @@ def _optional_name(value: Any, where: str) -> Optional[str]:
         return None
     if not isinstance(value, str) or not value:
         raise ConfigError(f"{where} must be a mode name")
+    return value
+
+
+def _optional_report_as(value: Any, where: str) -> Optional[str]:
+    if value is None:
+        return None
+    if value != "stopped":
+        raise ConfigError(f"{where} must be 'stopped'")
     return value
 
 

@@ -63,6 +63,10 @@ class Engine:
         snap = dict(self.status)
         snap["vars"] = _copy(self.status["vars"])
         snap["result"] = _copy(self.status["result"])
+        if snap["state"] == "running":
+            mode = self.config.modes.get(snap["mode"])
+            if mode is not None and mode.report_as:
+                snap["state"] = mode.report_as
         return snap
 
     async def start(self, mode: Optional[str] = None, variables: Optional[dict[str, Any]] = None) -> None:

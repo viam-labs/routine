@@ -33,7 +33,7 @@ This routine extends a switch, waits five seconds, retracts it, and stops:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `modes` | required | Named modes. Each has `steps`, and may have `then`, `pass`, `on_cancel`, and `on_dependency_error`. |
+| `modes` | required | Named modes. Each has `steps`, and may have `then`, `pass`, `on_cancel`, `on_dependency_error`, and `report_as`. |
 | `start_mode` | `idle` | Mode entered on start. Must name a configured mode. |
 | `auto_start` | `true` | Start that mode when the service configures. |
 | `on_dependency_error` | `retry_step` | What to do when a resource call fails. `retry_step`, `restart_mode`, `start_mode`, or `stop`. |
@@ -42,9 +42,29 @@ This routine extends a switch, waits five seconds, retracts it, and stops:
 
 ### Modes
 
-A mode is an ordered list of steps. It may also have `then`, `pass`, `on_cancel`, and `on_dependency_error`.
+A mode is an ordered list of steps. It may also have `then`, `pass`, `on_cancel`, `on_dependency_error`, and `report_as`.
 
 Steps run one after another. The next step starts when the current one returns. A call with `"wait": false` is the exception: it runs in the background until the mode changes.
+
+`report_as: "stopped"` keeps the mode running (so an `until` can still poll) while `GetStatus` and the heartbeat report `state` as `stopped`. Use that for a standby gate that should not look like an active delivery:
+
+```json
+"idle": {
+  "report_as": "stopped",
+  "steps": [
+    {
+      "until": {
+        "every": "5s",
+        "resource": "power",
+        "method": "GetReadings",
+        "request": {},
+        "when": "result.readings.is_charging == false"
+      },
+      "then": "ready"
+    }
+  ]
+}
+```
 
 A returned call means the RPC finished. Some methods, such as navigation `navigate_to_location` and docking `Start`, return as soon as they accept the goal. Follow them with an `until` step when the routine should wait until the action itself is done.
 

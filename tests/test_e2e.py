@@ -540,6 +540,52 @@ async def test_sleep_waits_between_calls():
 
 
 @pytest.mark.asyncio
+async def test_report_as_stopped_while_until_still_runs():
+    power = ScriptedGeneric("power")
+    power.respond = lambda _command: {"readings": {"is_charging": True}}
+    marker = ScriptedGeneric("marker")
+    config = {
+        "start_mode": "idle",
+        "modes": {
+            "idle": {
+                "report_as": "stopped",
+                "steps": [
+                    {
+                        "until": {
+                            "every": "50ms",
+                            "resource": "power",
+                            "method": "DoCommand",
+                            "request": {"command": {"query": "charge"}},
+                            "when": "result.readings.is_charging == false",
+                        },
+                        "then": "ready",
+                    }
+                ],
+            },
+            "ready": {
+                "steps": [
+                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "go"}}},
+                ]
+            },
+        },
+    }
+    lab = await start_lab(config, [power, marker])
+    try:
+        status = await _wait(
+            lab.service,
+            lambda current: current["state"] == "stopped"
+            and current["mode"] == "idle"
+            and current.get("result") == {"readings": {"is_charging": True}},
+        )
+        assert status["step_kind"] == "until"
+        power.respond = lambda _command: {"readings": {"is_charging": False}}
+        await _wait(lab.service, lambda current: current["state"] == "stopped" and current["mode"] == "ready")
+        assert marker.calls == [{"op": "go"}]
+    finally:
+        await lab.close()
+
+
+@pytest.mark.asyncio
 async def test_then_expression_chooses_next_mode():
     coffee = ScriptedGeneric("coffee")
     coffee.respond = lambda _command: {"available": True, "order_id": "ord-1"}
