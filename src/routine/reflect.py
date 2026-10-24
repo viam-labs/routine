@@ -15,11 +15,18 @@ from google.protobuf.descriptor import ServiceDescriptor
 from google.protobuf.descriptor_pb2 import FileDescriptorProto
 from google.protobuf.descriptor_pool import Default, DescriptorPool
 from grpclib.client import Channel
-from grpclib.reflection.v1.reflection_grpc import ServerReflectionStub as ServerReflectionStubV1
-from grpclib.reflection.v1.reflection_pb2 import ServerReflectionRequest as ServerReflectionRequestV1
-from grpclib.reflection.v1alpha.reflection_grpc import ServerReflectionStub as ServerReflectionStubV1Alpha
-from grpclib.reflection.v1alpha.reflection_pb2 import ServerReflectionRequest as ServerReflectionRequestV1Alpha
-
+from grpclib.reflection.v1.reflection_grpc import (
+    ServerReflectionStub as ServerReflectionStubV1,
+)
+from grpclib.reflection.v1.reflection_pb2 import (
+    ServerReflectionRequest as ServerReflectionRequestV1,
+)
+from grpclib.reflection.v1alpha.reflection_grpc import (
+    ServerReflectionStub as ServerReflectionStubV1Alpha,
+)
+from grpclib.reflection.v1alpha.reflection_pb2 import (
+    ServerReflectionRequest as ServerReflectionRequestV1Alpha,
+)
 from viam.logging import getLogger
 
 LOGGER = getLogger(__name__)
@@ -130,7 +137,9 @@ async def _from_channel(channel: Any, full_name: str) -> Optional[ServiceDescrip
     return None
 
 
-async def _gather(channel: Any, stub_type: Any, request_type: Any, full_name: str) -> dict[str, FileDescriptorProto]:
+async def _gather(
+    channel: Any, stub_type: Any, request_type: Any, full_name: str
+) -> dict[str, FileDescriptorProto]:
     files: dict[str, FileDescriptorProto] = {}
     stub = stub_type(channel)
     async with stub.ServerReflectionInfo.open() as stream:
@@ -149,7 +158,9 @@ async def _gather(channel: Any, stub_type: Any, request_type: Any, full_name: st
                     continue
                 reply = await _query(stream, request_type(file_by_filename=missing))
                 if reply is None:
-                    raise RuntimeError(f"reflection did not return dependency {missing} of {full_name}")
+                    raise RuntimeError(
+                        f"reflection did not return dependency {missing} of {full_name}"
+                    )
                 _absorb(files, reply)
         finally:
             await stream.end()

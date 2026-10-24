@@ -9,7 +9,15 @@ from typing import Any, Optional
 
 from viam.logging import getLogger
 
-from routine.config import CallStep, Mode, RoutineConfig, SleepStep, Step, UntilStep, effective_policy
+from routine.config import (
+    CallStep,
+    Mode,
+    RoutineConfig,
+    SleepStep,
+    Step,
+    UntilStep,
+    effective_policy,
+)
 from routine.expr import ExprError, is_true
 from routine.invoker import Invoker
 from routine.refs import RefError, resolve, resolve_mode_name
@@ -31,7 +39,9 @@ class StepFailure(Exception):
 
 
 class _Goto:
-    def __init__(self, mode: str, variables: dict[str, Any], start: Optional[str] = None) -> None:
+    def __init__(
+        self, mode: str, variables: dict[str, Any], start: Optional[str] = None
+    ) -> None:
         self.mode = mode
         self.variables = variables
         self.start = start
@@ -91,9 +101,13 @@ class Engine:
         async with self._lock:
             await self._cancel_monitor()
             self._monitor_stop = False
-            self._monitor = asyncio.create_task(self._monitor_main(self.config.background, {}))
+            self._monitor = asyncio.create_task(
+                self._monitor_main(self.config.background, {})
+            )
 
-    async def start(self, mode: Optional[str] = None, variables: Optional[dict[str, Any]] = None) -> None:
+    async def start(
+        self, mode: Optional[str] = None, variables: Optional[dict[str, Any]] = None
+    ) -> None:
         target = mode or self.config.start_mode
         if target not in self.config.modes:
             raise ValueError(f"unknown mode {target!r}")
@@ -105,7 +119,9 @@ class Engine:
             await self._cancel_runner()
             self._stop_requested = False
             self._cancel_requested = False
-            self._runner = asyncio.create_task(self._main(target, _copy(variables or {})))
+            self._runner = asyncio.create_task(
+                self._main(target, _copy(variables or {}))
+            )
 
     async def stop(self) -> None:
         async with self._lock:
@@ -137,7 +153,9 @@ class Engine:
     async def _main(self, mode: str, variables: dict[str, Any]) -> None:
         try:
             while True:
-                nxt = await self._run_mode(self.status, mode, variables, background=False)
+                nxt = await self._run_mode(
+                    self.status, mode, variables, background=False
+                )
                 if isinstance(nxt, _Goto):
                     mode, variables = nxt.mode, nxt.variables
                     continue
@@ -153,7 +171,9 @@ class Engine:
     async def _monitor_main(self, mode: str, variables: dict[str, Any]) -> None:
         try:
             while not self._monitor_stop:
-                nxt = await self._run_mode(self.background_status, mode, variables, background=True)
+                nxt = await self._run_mode(
+                    self.background_status, mode, variables, background=True
+                )
                 if isinstance(nxt, _Goto):
                     next_mode = self.config.modes[nxt.mode]
                     if not next_mode.report_status:
@@ -162,7 +182,10 @@ class Engine:
                         try:
                             await self.start(nxt.start, {})
                         except Exception:
-                            LOGGER.exception("background failed to start foreground mode %s", nxt.start)
+                            LOGGER.exception(
+                                "background failed to start foreground mode %s",
+                                nxt.start,
+                            )
                     mode, variables = nxt.mode, nxt.variables
                     continue
                 if self.config.background:
@@ -199,34 +222,46 @@ class Engine:
             for index, step in enumerate(mode.steps):
                 if not background and self._cancel_requested:
                     self._cancel_requested = False
-                    return await self._run_on_cancel(status, mode, variables, result, "cancelled", background=False)
+                    return await self._run_on_cancel(
+                        status, mode, variables, result, "cancelled", background=False
+                    )
                 status["step_index"] = index
                 status["step_kind"] = step.kind
                 self._touch(status)
                 try:
-                    result = await self._run_step(status, step, variables, result, mode, background=background)
+                    result = await self._run_step(
+                        status, step, variables, result, mode, background=background
+                    )
                 except CancelSignal as exc:
                     status["last_error"] = exc.reason
                     self._touch(status)
                     if background:
                         return None
-                    return await self._run_on_cancel(status, mode, variables, result, exc.reason, background=False)
+                    return await self._run_on_cancel(
+                        status, mode, variables, result, exc.reason, background=False
+                    )
                 except StepFailure as exc:
-                    return await self._apply_policy(status, exc, mode_name, variables, background=background)
+                    return await self._apply_policy(
+                        status, exc, mode_name, variables, background=background
+                    )
                 status["vars"] = _copy(variables)
                 if step.then:
                     try:
                         passed = self._passed(status, step, variables, result, mode)
                         target = self._then_target(status, step.then, variables, result)
                     except StepFailure as exc:
-                        return await self._apply_policy(status, exc, mode_name, variables, background=background)
+                        return await self._apply_policy(
+                            status, exc, mode_name, variables, background=background
+                        )
                     return _Goto(target, passed)
             if mode.then:
                 try:
                     passed = self._passed_mode(status, mode, variables, result)
                     target = self._then_target(status, mode.then, variables, result)
                 except StepFailure as exc:
-                    return await self._apply_policy(status, exc, mode_name, variables, background=background)
+                    return await self._apply_policy(
+                        status, exc, mode_name, variables, background=background
+                    )
                 start = mode.start if background else None
                 return _Goto(target, passed, start=start)
             return None
@@ -271,25 +306,33 @@ class Engine:
             status["step_kind"] = step.kind
             self._touch(status)
             try:
-                result = await self._run_step(status, step, variables, result, mode, background=background)
+                result = await self._run_step(
+                    status, step, variables, result, mode, background=background
+                )
             except CancelSignal as exc:
                 status["last_error"] = exc.reason
                 self._touch(status)
                 return None
             except StepFailure as exc:
-                return await self._apply_policy(status, exc, mode.name, variables, background=background)
+                return await self._apply_policy(
+                    status, exc, mode.name, variables, background=background
+                )
             if step.then:
                 try:
                     passed = self._passed(status, step, variables, result, mode)
                     target = self._then_target(status, step.then, variables, result)
                 except StepFailure as exc:
-                    return await self._apply_policy(status, exc, mode.name, variables, background=background)
+                    return await self._apply_policy(
+                        status, exc, mode.name, variables, background=background
+                    )
                 return _Goto(target, passed)
         if cancel.then:
             try:
                 target = self._then_target(status, cancel.then, variables, result)
             except StepFailure as exc:
-                return await self._apply_policy(status, exc, mode.name, variables, background=background)
+                return await self._apply_policy(
+                    status, exc, mode.name, variables, background=background
+                )
             return _Goto(target, {})
         return None
 
@@ -304,7 +347,9 @@ class Engine:
     ) -> Optional[_Goto]:
         status["last_error"] = str(failure.error)
         self._touch(status)
-        LOGGER.warning("step failed in mode %s (%s): %s", mode_name, failure.policy, failure.error)
+        LOGGER.warning(
+            "step failed in mode %s (%s): %s", mode_name, failure.policy, failure.error
+        )
         if failure.policy == "retry_step":
             return _Goto(mode_name, variables)
         if failure.policy == "restart_mode":
@@ -312,7 +357,11 @@ class Engine:
             return _Goto(mode_name, variables)
         if failure.policy == "start_mode":
             await asyncio.sleep(0)
-            target = self.config.background if background and self.config.background else self.config.start_mode
+            target = (
+                self.config.background
+                if background and self.config.background
+                else self.config.start_mode
+            )
             return _Goto(target, {})
         status["state"] = "error"
         self._touch(status)
@@ -346,7 +395,9 @@ class Engine:
         try:
             return await task
         except asyncio.CancelledError:
-            if (background and self._monitor_stop) or (not background and self._stop_requested):
+            if (background and self._monitor_stop) or (
+                not background and self._stop_requested
+            ):
                 raise
             if not background:
                 self._cancel_requested = False
@@ -363,7 +414,9 @@ class Engine:
                 with suppress(asyncio.CancelledError, Exception):
                     await task
 
-    async def _run_call(self, status: dict[str, Any], step: CallStep, scope: dict[str, Any], mode: Mode) -> Any:
+    async def _run_call(
+        self, status: dict[str, Any], step: CallStep, scope: dict[str, Any], mode: Mode
+    ) -> Any:
         request = self._resolve(step.request, scope, step, mode)
         if not step.wait:
             task = asyncio.create_task(self._fire_call(step, request))
@@ -372,7 +425,9 @@ class Engine:
             return scope.get("result")
 
         async def attempt() -> Any:
-            return await self.invoker.call(step.resource, step.method, request, timeout=step.timeout)
+            return await self.invoker.call(
+                step.resource, step.method, request, timeout=step.timeout
+            )
 
         value = await self._with_policy(attempt, step, mode)
         self._set_result(status, value)
@@ -380,15 +435,23 @@ class Engine:
 
     async def _fire_call(self, step: CallStep, request: dict[str, Any]) -> None:
         try:
-            await self.invoker.call(step.resource, step.method, request, timeout=step.timeout)
+            await self.invoker.call(
+                step.resource, step.method, request, timeout=step.timeout
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
             LOGGER.exception("background call %s.%s failed", step.resource, step.method)
 
-    async def _run_until(self, status: dict[str, Any], step: UntilStep, scope: dict[str, Any], mode: Mode) -> Any:
+    async def _run_until(
+        self, status: dict[str, Any], step: UntilStep, scope: dict[str, Any], mode: Mode
+    ) -> Any:
         request = self._resolve(step.request, scope, step, mode)
-        deadline = None if step.timeout is None else asyncio.get_running_loop().time() + step.timeout
+        deadline = (
+            None
+            if step.timeout is None
+            else asyncio.get_running_loop().time() + step.timeout
+        )
         while True:
             now = asyncio.get_running_loop().time()
             if deadline is not None and now >= deadline:
@@ -401,15 +464,21 @@ class Engine:
             self._set_result(status, result)
             poll_scope = {**scope, "result": result, "status": self.snapshot()}
             try:
-                if step.cancel_expr is not None and is_true(step.cancel_expr, poll_scope):
+                if step.cancel_expr is not None and is_true(
+                    step.cancel_expr, poll_scope
+                ):
                     raise CancelSignal("cancel condition met")
                 if is_true(step.when_expr, poll_scope):
                     return result
             except ExprError as exc:
-                raise StepFailure(effective_policy(step, mode, self.config), exc) from exc
+                raise StepFailure(
+                    effective_policy(step, mode, self.config), exc
+                ) from exc
             delay = step.every
             if deadline is not None:
-                delay = min(delay, max(0.0, deadline - asyncio.get_running_loop().time()))
+                delay = min(
+                    delay, max(0.0, deadline - asyncio.get_running_loop().time())
+                )
                 if delay <= 0:
                     raise CancelSignal("until timed out")
             await asyncio.sleep(delay)
@@ -429,7 +498,9 @@ class Engine:
             except Exception as exc:
                 if policy != "retry_step":
                     raise StepFailure(policy, exc) from exc
-                delay = min(self.config.retry.initial * (2**tries), self.config.retry.max)
+                delay = min(
+                    self.config.retry.initial * (2**tries), self.config.retry.max
+                )
                 tries += 1
                 LOGGER.warning(
                     "retrying %s.%s in %.3fs after %s",
@@ -440,25 +511,41 @@ class Engine:
                 )
                 await asyncio.sleep(delay)
 
-    def _resolve(self, value: Any, scope: dict[str, Any], step: Step, mode: Mode) -> Any:
+    def _resolve(
+        self, value: Any, scope: dict[str, Any], step: Step, mode: Mode
+    ) -> Any:
         try:
             resolved = resolve(value, scope)
         except RefError as exc:
             raise StepFailure(effective_policy(step, mode, self.config), exc) from exc
         if not isinstance(resolved, dict):
-            raise StepFailure(effective_policy(step, mode, self.config), RefError("request must resolve to an object"))
+            raise StepFailure(
+                effective_policy(step, mode, self.config),
+                RefError("request must resolve to an object"),
+            )
         return resolved
 
-    def _then_target(self, status: dict[str, Any], then: str, variables: dict[str, Any], result: Any) -> str:
+    def _then_target(
+        self, status: dict[str, Any], then: str, variables: dict[str, Any], result: Any
+    ) -> str:
         try:
             target = resolve_mode_name(then, _scope(variables, result, self.snapshot()))
         except RefError as exc:
             raise StepFailure(self.config.on_dependency_error, exc) from exc
         if target not in self.config.modes:
-            raise StepFailure(self.config.on_dependency_error, RefError(f"unknown mode {target!r}"))
+            raise StepFailure(
+                self.config.on_dependency_error, RefError(f"unknown mode {target!r}")
+            )
         return target
 
-    def _passed(self, status: dict[str, Any], step: Step, variables: dict[str, Any], result: Any, mode: Mode) -> dict[str, Any]:
+    def _passed(
+        self,
+        status: dict[str, Any],
+        step: Step,
+        variables: dict[str, Any],
+        result: Any,
+        mode: Mode,
+    ) -> dict[str, Any]:
         if not step.pass_vars:
             return {}
         try:
@@ -466,10 +553,15 @@ class Engine:
         except RefError as exc:
             raise StepFailure(effective_policy(step, mode, self.config), exc) from exc
         if not isinstance(passed, dict):
-            raise StepFailure(effective_policy(step, mode, self.config), RefError("pass must resolve to an object"))
+            raise StepFailure(
+                effective_policy(step, mode, self.config),
+                RefError("pass must resolve to an object"),
+            )
         return passed
 
-    def _passed_mode(self, status: dict[str, Any], mode: Mode, variables: dict[str, Any], result: Any) -> dict[str, Any]:
+    def _passed_mode(
+        self, status: dict[str, Any], mode: Mode, variables: dict[str, Any], result: Any
+    ) -> dict[str, Any]:
         if not mode.pass_vars:
             return {}
         try:
@@ -520,7 +612,9 @@ class Engine:
         status["updated_at"] = _now()
 
 
-def _scope(variables: dict[str, Any], result: Any, status: dict[str, Any]) -> dict[str, Any]:
+def _scope(
+    variables: dict[str, Any], result: Any, status: dict[str, Any]
+) -> dict[str, Any]:
     return {**variables, "result": result, "status": status}
 
 
