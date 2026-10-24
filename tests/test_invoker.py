@@ -1,6 +1,5 @@
 from google.protobuf.descriptor_pool import Default
 from google.protobuf.json_format import MessageToDict
-
 from viam.proto.common import DoCommandResponse
 from viam.utils import dict_to_struct
 

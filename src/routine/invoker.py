@@ -17,13 +17,13 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.message import Message
 from google.protobuf.message_factory import GetMessageClass
 from grpclib.client import UnaryUnaryMethod
-
-from routine.reflect import DescriptorNotFound, load_service
 from viam.proto.robot import (
     ResourceNamesRequest,
     ResourceRPCSubtypesRequest,
     RobotServiceStub,
 )
+
+from routine.reflect import DescriptorNotFound, load_service
 
 _BUILTINS_LOADED = False
 

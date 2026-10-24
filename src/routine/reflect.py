@@ -27,7 +27,6 @@ from grpclib.reflection.v1alpha.reflection_grpc import (
 from grpclib.reflection.v1alpha.reflection_pb2 import (
     ServerReflectionRequest as ServerReflectionRequestV1Alpha,
 )
-
 from viam.logging import getLogger
 
 LOGGER = getLogger(__name__)

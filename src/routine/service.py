@@ -12,7 +12,7 @@ from viam.resource.easy_resource import EasyResource
 from viam.services.generic import Generic
 from viam.utils import ValueTypes, struct_to_dict
 
-from routine.config import ConfigError, RoutineConfig, parse_config
+from routine.config import RoutineConfig, parse_config
 from routine.engine import Engine
 from routine.heartbeat import start_heartbeat
 from routine.invoker import Invoker

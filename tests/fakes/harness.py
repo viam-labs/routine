@@ -16,10 +16,8 @@ from grpclib import GRPCError
 from grpclib.const import Cardinality, Handler, Status
 from grpclib.reflection.service import ServerReflection
 from grpclib.server import Server as GRPCServer
-
 from viam.components.servo import Servo
 from viam.proto.common import ResourceName
-from viam.services.generic import Generic
 from viam.proto.robot import (
     ResourceNamesRequest,
     ResourceNamesResponse,
@@ -31,6 +29,7 @@ from viam.resource.types import API
 from viam.robot.client import RobotClient
 from viam.rpc.dial import DialOptions
 from viam.rpc.server import Server
+from viam.services.generic import Generic
 
 from routine.parent import set_module
 from routine.service import Routine
