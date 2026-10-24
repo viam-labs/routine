@@ -28,11 +28,18 @@ def build_pool() -> DescriptorPool:
             field.label = _LABEL_OPTIONAL
             field.type = field_type
 
-    add_message("NavigateToLocationRequest", [("name", 1, _TYPE_STRING), ("location_name", 2, _TYPE_STRING)])
+    add_message(
+        "NavigateToLocationRequest",
+        [("name", 1, _TYPE_STRING), ("location_name", 2, _TYPE_STRING)],
+    )
     add_message("NavigateToLocationResponse", [])
     add_message(
         "GoToLocationRequest",
-        [("name", 1, _TYPE_STRING), ("location_name", 2, _TYPE_STRING), ("linear_m_per_sec", 3, _TYPE_DOUBLE)],
+        [
+            ("name", 1, _TYPE_STRING),
+            ("location_name", 2, _TYPE_STRING),
+            ("linear_m_per_sec", 3, _TYPE_DOUBLE),
+        ],
     )
     add_message("GoToLocationResponse", [])
     add_message("PlayRequest", [("name", 1, _TYPE_STRING), ("sound", 2, _TYPE_STRING)])
@@ -50,7 +57,11 @@ def build_pool() -> DescriptorPool:
     add_rpc(
         "FakeNavService",
         [
-            ("NavigateToLocation", "NavigateToLocationRequest", "NavigateToLocationResponse"),
+            (
+                "NavigateToLocation",
+                "NavigateToLocationRequest",
+                "NavigateToLocationResponse",
+            ),
             ("GoToLocation", "GoToLocationRequest", "GoToLocationResponse"),
         ],
     )

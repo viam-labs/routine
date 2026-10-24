@@ -75,7 +75,9 @@ async def start_lab(config: dict[str, Any], resources: list[Any]) -> Lab:
     """Start a robot, connect a client, and boot a routine with ``config``."""
     pool = build_pool()
     nav = next((res for res in resources if getattr(res, "API", None) == NAV_API), None)
-    speaker = next((res for res in resources if getattr(res, "API", None) == SPEAKER_API), None)
+    speaker = next(
+        (res for res in resources if getattr(res, "API", None) == SPEAKER_API), None
+    )
     builtin = [res for res in resources if res.API in (Servo.API, Generic.API)]
     custom = [res for res in resources if res not in builtin]
     server = Server(builtin)
@@ -90,7 +92,9 @@ async def start_lab(config: dict[str, Any], resources: list[Any]) -> Lab:
     )
     module_socket = os.path.join(tmp.name, "action-module.sock")
     await module_server.start(path=module_socket)
-    serve_task = asyncio.create_task(server._serve(path=socket_path, log_level=logging.ERROR))
+    serve_task = asyncio.create_task(
+        server._serve(path=socket_path, log_level=logging.ERROR)
+    )
     for _ in range(200):
         if os.path.exists(socket_path):
             break
@@ -169,11 +173,15 @@ def _install_robot_rpcs(server: Server, extra: list[Any]) -> None:
                 continue
             items.append(
                 ResourceRPCSubtype(
-                    subtype=ResourceName(namespace=key[0], type=key[1], subtype=key[2], name=""),
+                    subtype=ResourceName(
+                        namespace=key[0], type=key[1], subtype=key[2], name=""
+                    ),
                     proto_service=proto,
                 )
             )
-        await stream.send_message(ResourceRPCSubtypesResponse(resource_rpc_subtypes=items))
+        await stream.send_message(
+            ResourceRPCSubtypesResponse(resource_rpc_subtypes=items)
+        )
 
     mapping = server._server._mapping
     mapping["/viam.robot.v1.RobotService/ResourceNames"] = Handler(
@@ -203,7 +211,9 @@ def _install_custom_rpcs(
         request_type = GetMessageClass(desc.input_type)
         response_type = GetMessageClass(desc.output_type)
 
-        async def handle(stream: Any, bound: RecordedService = resource, method_name: str = method) -> None:
+        async def handle(
+            stream: Any, bound: RecordedService = resource, method_name: str = method
+        ) -> None:
             message = await stream.recv_message()
             assert message is not None
             payload = MessageToDict(message, preserving_proto_field_name=True)

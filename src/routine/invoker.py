@@ -48,10 +48,16 @@ class Invoker:
         proto_by_api: dict[tuple[str, str, str], str] = {}
         for item in subtypes.resource_rpc_subtypes:
             subtype = item.subtype
-            proto_by_api[(subtype.namespace, subtype.type, subtype.subtype)] = item.proto_service
+            proto_by_api[(subtype.namespace, subtype.type, subtype.subtype)] = (
+                item.proto_service
+            )
         by_name: dict[str, tuple[str, str, str]] = {}
         for resource in names.resources:
-            by_name[resource.name] = (resource.namespace, resource.type, resource.subtype)
+            by_name[resource.name] = (
+                resource.namespace,
+                resource.type,
+                resource.subtype,
+            )
         self._proto_by_api = proto_by_api
         self._by_name = by_name
 
@@ -78,11 +84,15 @@ class Invoker:
             raise InvokerError(f"resource {resource!r} was not found on the machine")
         proto = self._proto_by_api.get(api)
         if not proto:
-            raise InvokerError(f"resource {resource!r} has no protobuf service for API {':'.join(api)}")
+            raise InvokerError(
+                f"resource {resource!r} has no protobuf service for API {':'.join(api)}"
+            )
         service = await self._service(proto)
         return _find_method(service, method)
 
-    async def check_configured_methods(self, resources_and_methods: list[tuple[str, str]]) -> None:
+    async def check_configured_methods(
+        self, resources_and_methods: list[tuple[str, str]]
+    ) -> None:
         for resource, method in resources_and_methods:
             await self.describe(resource, method)
 
@@ -102,7 +112,9 @@ class Invoker:
                     "The module that provides this API must be running on the machine."
                 ) from exc
             except Exception as exc:
-                raise InvokerError(f"could not load proto service {full_name}: {exc}") from exc
+                raise InvokerError(
+                    f"could not load proto service {full_name}: {exc}"
+                ) from exc
             self.reflected.add(full_name)
         self._services[full_name] = service
         return service
@@ -111,7 +123,9 @@ class Invoker:
 _DO_COMMAND_FIELDS = {"name", "command"}
 
 
-def build_request(method: MethodDescriptor, resource: str, payload: dict[str, Any]) -> Message:
+def build_request(
+    method: MethodDescriptor, resource: str, payload: dict[str, Any]
+) -> Message:
     message = GetMessageClass(method.input_type)()
     body = dict(payload)
     # Match the Go and Python SDKs: the map passed to DoCommand is the command
@@ -129,7 +143,9 @@ def build_request(method: MethodDescriptor, resource: str, payload: dict[str, An
 
 
 def _is_raw_do_command(body: dict[str, Any]) -> bool:
-    return isinstance(body.get("command"), dict) and set(body).issubset(_DO_COMMAND_FIELDS)
+    return isinstance(body.get("command"), dict) and set(body).issubset(
+        _DO_COMMAND_FIELDS
+    )
 
 
 def decode_response(method: MethodDescriptor, response: Message) -> Any:
@@ -149,10 +165,14 @@ def _find_method(service: ServiceDescriptor, name: str) -> MethodDescriptor:
     for method in service.methods:
         if method.name == pascal:
             if method.client_streaming or method.server_streaming:
-                raise InvokerError(f"{service.full_name}/{method.name} is a streaming method and cannot be called")
+                raise InvokerError(
+                    f"{service.full_name}/{method.name} is a streaming method and cannot be called"
+                )
             return method
     known = ", ".join(method.name for method in service.methods)
-    raise InvokerError(f"{service.full_name} has no method {name!r}. Known methods: {known}")
+    raise InvokerError(
+        f"{service.full_name} has no method {name!r}. Known methods: {known}"
+    )
 
 
 def _load_builtin_descriptors() -> None:

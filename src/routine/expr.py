@@ -84,7 +84,9 @@ def evaluate(node: Node, scope: dict[str, Any], *, strict_paths: bool = False) -
     if isinstance(node, Call):
         return _call(node, scope, strict_paths=strict_paths)
     if isinstance(node, Index):
-        return _index(evaluate(node.value, scope, strict_paths=strict_paths), node.index)
+        return _index(
+            evaluate(node.value, scope, strict_paths=strict_paths), node.index
+        )
     if isinstance(node, If):
         if _truthy(evaluate(node.condition, scope, strict_paths=strict_paths)):
             return evaluate(node.then_value, scope, strict_paths=strict_paths)
@@ -141,7 +143,9 @@ def _index(value: Any, index: int) -> Any:
     return value[index]
 
 
-def _lookup_path(parts: Sequence[Union[str, int]], scope: dict[str, Any], *, strict: bool = False) -> Any:
+def _lookup_path(
+    parts: Sequence[Union[str, int]], scope: dict[str, Any], *, strict: bool = False
+) -> Any:
     first = parts[0]
     if not isinstance(first, str):
         raise ExprError("invalid path")

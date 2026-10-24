@@ -6,7 +6,14 @@ def _true(source: str, scope: dict) -> bool:
 
 
 def test_comparisons_and_bare_words():
-    scope = {"result": {"status": "handed_over", "cup_present": False, "available": True, "count": 2}}
+    scope = {
+        "result": {
+            "status": "handed_over",
+            "cup_present": False,
+            "available": True,
+            "count": 2,
+        }
+    }
     assert _true("result.status == handed_over", scope)
     assert not _true("result.status == canceled", scope)
     assert _true("result.cup_present == false", scope)
@@ -19,7 +26,9 @@ def test_indexing_and_logic():
     scope = {"result": {"items": [{"name": "cup"}, {"name": "lid"}]}}
     assert _true("result.items[0].name == cup", scope)
     assert _true("result.items[1].name == lid or result.items[0].name == lid", scope)
-    assert _true("(result.items[0].name == lid) or (result.items[0].name == cup)", scope)
+    assert _true(
+        "(result.items[0].name == lid) or (result.items[0].name == cup)", scope
+    )
 
 
 def test_missing_path_is_false():
