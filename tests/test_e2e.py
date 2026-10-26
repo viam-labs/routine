@@ -16,9 +16,7 @@ async def _status(service: Routine) -> dict[str, Any]:
     return result["status"]
 
 
-async def _wait(
-    service: Routine, predicate: Any, timeout: float = 3.0
-) -> dict[str, Any]:
+async def _wait(service: Routine, predicate: Any, timeout: float = 3.0) -> dict[str, Any]:
     deadline = asyncio.get_running_loop().time() + timeout
     last: Optional[dict[str, Any]] = None
     while asyncio.get_running_loop().time() < deadline:
@@ -39,10 +37,7 @@ class Orders:
         if command.get("query") == "next_delivery_order":
             self.queries += 1
             if self.queries == 2:
-                return {
-                    "available": True,
-                    "order": {"id": "ord-1", "destination": "desk-4"},
-                }
+                return {"available": True, "order": {"id": "ord-1", "destination": "desk-4"}}
             return {"available": False}
         if "ready_for_order" in command:
             return {"ok": True}
@@ -91,22 +86,13 @@ def _coffee_config() -> dict[str, Any]:
                     {
                         "resource": "delivery_nav",
                         "method": "GoToLocation",
-                        "request": {
-                            "location_name": "coffee_maker_dock",
-                            "linear_m_per_sec": 0.2,
-                        },
+                        "request": {"location_name": "coffee_maker_dock", "linear_m_per_sec": 0.2},
                     },
-                    {
-                        "resource": "tray",
-                        "method": "Move",
-                        "request": {"angle_deg": 90},
-                    },
+                    {"resource": "tray", "method": "Move", "request": {"angle_deg": 90}},
                     {
                         "resource": "coffee_maker:orders",
                         "method": "DoCommand",
-                        "request": {
-                            "command": {"ready_for_order": {"order_id": "${order.id}"}}
-                        },
+                        "request": {"command": {"ready_for_order": {"order_id": "${order.id}"}}},
                     },
                     {
                         "until": {
@@ -114,9 +100,7 @@ def _coffee_config() -> dict[str, Any]:
                             "timeout": "300ms",
                             "resource": "coffee_maker:orders",
                             "method": "DoCommand",
-                            "request": {
-                                "command": {"order_status": {"order_id": "${order.id}"}}
-                            },
+                            "request": {"command": {"order_status": {"order_id": "${order.id}"}}},
                             "when": "result.status == handed_over",
                             "cancel_when": "result.status == canceled",
                         }
@@ -126,13 +110,7 @@ def _coffee_config() -> dict[str, Any]:
                 "then": "delivering",
                 "pass": {"order": "${order}"},
                 "on_cancel": {
-                    "steps": [
-                        {
-                            "resource": "tray",
-                            "method": "Move",
-                            "request": {"angle_deg": 0},
-                        }
-                    ],
+                    "steps": [{"resource": "tray", "method": "Move", "request": {"angle_deg": 0}}],
                     "then": "idle",
                 },
             },
@@ -143,11 +121,7 @@ def _coffee_config() -> dict[str, Any]:
                         "method": "NavigateToLocation",
                         "request": {"location_name": "${order.destination}"},
                     },
-                    {
-                        "resource": "speaker",
-                        "method": "Play",
-                        "request": {"sound": "delivery_arrived"},
-                    },
+                    {"resource": "speaker", "method": "Play", "request": {"sound": "delivery_arrived"}},
                     {
                         "until": {
                             "every": "20ms",
@@ -217,18 +191,9 @@ async def test_coffee_delivery_happy_path():
         goto = next(event for event in nav if event[1] == "GoToLocation")
         assert goto[2]["location_name"] == "coffee_maker_dock"
         assert goto[2]["linear_m_per_sec"] == pytest.approx(0.2)
-        desk = [
-            event
-            for event in nav
-            if event[1] == "NavigateToLocation"
-            and event[2]["location_name"] == "desk-4"
-        ]
+        desk = [event for event in nav if event[1] == "NavigateToLocation" and event[2]["location_name"] == "desk-4"]
         assert desk
-        ready = next(
-            event
-            for event in trace
-            if event[0] == "coffee_maker:orders" and "ready_for_order" in event[2]
-        )
+        ready = next(event for event in trace if event[0] == "coffee_maker:orders" and "ready_for_order" in event[2])
         assert ready[2]["ready_for_order"]["order_id"] == "ord-1"
         play = next(event for event in trace if event[1] == "Play")
         assert play[2]["name"] == "speaker"
@@ -245,16 +210,9 @@ async def test_cancel_returns_tray_and_idles():
     lab, trace = await _boot_coffee("cancel")
     try:
         await _wait(
-            lab.service,
-            lambda _status: (
-                any(event[1] == "Play" for event in trace)
-                or _tray_zero_after_raise(trace)
-            ),
+            lab.service, lambda _status: any(event[1] == "Play" for event in trace) or _tray_zero_after_raise(trace)
         )
-        await _wait(
-            lab.service,
-            lambda status: status["mode"] == "idle" and status["state"] == "running",
-        )
+        await _wait(lab.service, lambda status: status["mode"] == "idle" and status["state"] == "running")
         angles = [event[2]["angle_deg"] for event in trace if event[0] == "tray"]
         assert angles == [90, 0]
         assert not any(event[1] == "Play" for event in trace)
@@ -271,12 +229,7 @@ def _tray_zero_after_raise(trace: list[Any]) -> bool:
 async def test_until_timeout_runs_on_cancel():
     lab, trace = await _boot_coffee("timeout")
     try:
-        await _wait(
-            lab.service,
-            lambda status: (
-                status["mode"] == "idle" and status["last_error"] == "until timed out"
-            ),
-        )
+        await _wait(lab.service, lambda status: status["mode"] == "idle" and status["last_error"] == "until timed out")
         angles = [event[2]["angle_deg"] for event in trace if event[0] == "tray"]
         assert 90 in angles and 0 in angles
         assert not any(event[1] == "Play" for event in trace)
@@ -292,17 +245,9 @@ def _policy_config(level: str, policy: str) -> dict[str, Any]:
     }
     mode: dict[str, Any] = {
         "steps": [
-            {
-                "resource": "marker",
-                "method": "DoCommand",
-                "request": {"command": {"op": "begin"}},
-            },
+            {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "begin"}}},
             flaky,
-            {
-                "resource": "marker",
-                "method": "DoCommand",
-                "request": {"command": {"op": "after"}},
-            },
+            {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "after"}}},
         ],
         "then": "end",
     }
@@ -315,11 +260,7 @@ def _policy_config(level: str, policy: str) -> dict[str, Any]:
         "start_mode": "work",
         "on_dependency_error": "retry_step" if level != "global" else policy,
         "retry": {"initial": "10ms", "max": "20ms"},
-        "modes": {
-            "work": mode,
-            "end": {"steps": []},
-            "home": {"steps": [], "then": "work"},
-        },
+        "modes": {"work": mode, "end": {"steps": []}, "home": {"steps": [], "then": "work"}},
     }
 
 
@@ -330,10 +271,7 @@ async def test_retry_step_precedes_mode_policy():
     flaky.fail_remaining = 2
     lab = await start_lab(_policy_config("step", "retry_step"), [flaky, marker])
     try:
-        await _wait(
-            lab.service,
-            lambda status: status["state"] == "stopped" and status["mode"] == "end",
-        )
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["mode"] == "end")
         assert len(flaky.calls) == 3
         assert [call["op"] for call in marker.calls] == ["begin", "after"]
     finally:
@@ -363,16 +301,8 @@ async def test_restart_mode_repeats_earlier_steps():
     flaky.fail_remaining = 2
     lab = await start_lab(_policy_config("mode", "restart_mode"), [flaky, marker])
     try:
-        await _wait(
-            lab.service,
-            lambda status: status["state"] == "stopped" and status["mode"] == "end",
-        )
-        assert [call["op"] for call in marker.calls] == [
-            "begin",
-            "begin",
-            "begin",
-            "after",
-        ]
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["mode"] == "end")
+        assert [call["op"] for call in marker.calls] == ["begin", "begin", "begin", "after"]
         assert len(flaky.calls) == 3
     finally:
         await lab.close()
@@ -388,28 +318,14 @@ async def test_start_mode_policy():
         "retry": {"initial": "10ms", "max": "20ms"},
         "modes": {
             "home": {
-                "steps": [
-                    {
-                        "resource": "home_marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "home"}},
-                    }
-                ],
+                "steps": [{"resource": "home_marker", "method": "DoCommand", "request": {"command": {"op": "home"}}}],
                 "then": "work",
             },
             "work": {
                 "on_dependency_error": "start_mode",
                 "steps": [
-                    {
-                        "resource": "flaky",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "ping"}},
-                    },
-                    {
-                        "resource": "home_marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "work_ok"}},
-                    },
+                    {"resource": "flaky", "method": "DoCommand", "request": {"command": {"op": "ping"}}},
+                    {"resource": "home_marker", "method": "DoCommand", "request": {"command": {"op": "work_ok"}}},
                 ],
                 "then": "end",
             },
@@ -418,10 +334,7 @@ async def test_start_mode_policy():
     }
     lab = await start_lab(config, [flaky, home])
     try:
-        await _wait(
-            lab.service,
-            lambda status: status["mode"] == "end" and status["state"] == "stopped",
-        )
+        await _wait(lab.service, lambda status: status["mode"] == "end" and status["state"] == "stopped")
         assert [call["op"] for call in home.calls] == ["home", "home", "work_ok"]
         assert len(flaky.calls) == 2
     finally:
@@ -438,16 +351,8 @@ async def test_stop_policy():
             "work": {
                 "on_dependency_error": "stop",
                 "steps": [
-                    {
-                        "resource": "flaky",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "ping"}},
-                    },
-                    {
-                        "resource": "flaky",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "after"}},
-                    },
+                    {"resource": "flaky", "method": "DoCommand", "request": {"command": {"op": "ping"}}},
+                    {"resource": "flaky", "method": "DoCommand", "request": {"command": {"op": "after"}}},
                 ],
             }
         },
@@ -470,17 +375,8 @@ async def test_wait_false_does_not_block_the_mode():
         "modes": {
             "go": {
                 "steps": [
-                    {
-                        "resource": "tray",
-                        "method": "Move",
-                        "request": {"angle_deg": 10},
-                        "wait": False,
-                    },
-                    {
-                        "resource": "marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "next"}},
-                    },
+                    {"resource": "tray", "method": "Move", "request": {"angle_deg": 10}, "wait": False},
+                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "next"}}},
                 ],
                 "then": "end",
             },
@@ -490,11 +386,7 @@ async def test_wait_false_does_not_block_the_mode():
     started = time.monotonic()
     lab = await start_lab(config, [tray, marker])
     try:
-        await _wait(
-            lab.service,
-            lambda status: status["state"] == "stopped" and status["mode"] == "end",
-            timeout=2,
-        )
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["mode"] == "end", timeout=2)
         assert time.monotonic() - started < 0.45
         assert marker.calls == [{"op": "next"}]
         assert tray.started.is_set()
@@ -510,15 +402,7 @@ async def test_mode_without_then_stops():
     config = {
         "start_mode": "once",
         "modes": {
-            "once": {
-                "steps": [
-                    {
-                        "resource": "marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "ran"}},
-                    }
-                ]
-            }
+            "once": {"steps": [{"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "ran"}}}]}
         },
     }
     lab = await start_lab(config, [marker])
@@ -543,15 +427,7 @@ async def test_do_command_controls():
         "auto_start": False,
         "start_mode": "idle",
         "modes": {
-            "idle": {
-                "steps": [
-                    {
-                        "resource": "marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "idle"}},
-                    }
-                ]
-            },
+            "idle": {"steps": [{"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "idle"}}}]},
             "wait": {
                 "steps": [
                     {
@@ -565,13 +441,7 @@ async def test_do_command_controls():
                     }
                 ],
                 "on_cancel": {
-                    "steps": [
-                        {
-                            "resource": "parked",
-                            "method": "DoCommand",
-                            "request": {"command": {"op": "park"}},
-                        }
-                    ],
+                    "steps": [{"resource": "parked", "method": "DoCommand", "request": {"command": {"op": "park"}}}],
                     "then": "idle",
                 },
             },
@@ -583,32 +453,18 @@ async def test_do_command_controls():
         assert status["state"] == "stopped"
         assert status["mode"] is None
         await lab.service.do_command({"command": "start"})
-        await _wait(
-            lab.service,
-            lambda current: current["state"] == "stopped" and current["mode"] == "idle",
-        )
+        await _wait(lab.service, lambda current: current["state"] == "stopped" and current["mode"] == "idle")
         assert {"op": "idle"} in marker.calls
 
         await lab.service.do_command({"command": "set_mode", "mode": "wait"})
-        await _wait(
-            lab.service,
-            lambda _current: any(call.get("op") == "poll" for call in marker.calls),
-        )
+        await _wait(lab.service, lambda _current: any(call.get("op") == "poll" for call in marker.calls))
         await lab.service.do_command({"command": "cancel"})
-        await _wait(
-            lab.service,
-            lambda current: current["state"] == "stopped" and current["mode"] == "idle",
-        )
+        await _wait(lab.service, lambda current: current["state"] == "stopped" and current["mode"] == "idle")
         assert parked.calls == [{"op": "park"}]
 
         parks = len(parked.calls)
         await lab.service.do_command({"command": "set_mode", "mode": "wait"})
-        await _wait(
-            lab.service,
-            lambda _current: (
-                sum(call.get("op") == "poll" for call in marker.calls) >= 2
-            ),
-        )
+        await _wait(lab.service, lambda _current: sum(call.get("op") == "poll" for call in marker.calls) >= 2)
         await lab.service.do_command({"command": "stop"})
         await asyncio.sleep(0.08)
         assert len(parked.calls) == parks
@@ -631,9 +487,7 @@ async def test_heartbeat_reports_while_running_and_stopped():
             "every_secs": 0.05,
             "resource": "fleet_status",
             "method": "DoCommand",
-            "request": {
-                "command": {"mode": "${status.mode}", "state": "${status.state}"}
-            },
+            "request": {"command": {"mode": "${status.mode}", "state": "${status.state}"}},
         },
         "modes": {
             "watch": {
@@ -655,16 +509,10 @@ async def test_heartbeat_reports_while_running_and_stopped():
     try:
         await _wait(
             lab.service,
-            lambda _status: any(
-                call.get("state") == "running" and call.get("mode") == "watch"
-                for call in fleet.calls
-            ),
+            lambda _status: any(call.get("state") == "running" and call.get("mode") == "watch" for call in fleet.calls),
         )
         await lab.service.do_command({"command": "stop"})
-        await _wait(
-            lab.service,
-            lambda _status: any(call.get("state") == "stopped" for call in fleet.calls),
-        )
+        await _wait(lab.service, lambda _status: any(call.get("state") == "stopped" for call in fleet.calls))
     finally:
         await lab.close()
 
@@ -677,17 +525,9 @@ async def test_sleep_waits_between_calls():
         "modes": {
             "pulse": {
                 "steps": [
-                    {
-                        "resource": "relay",
-                        "method": "DoCommand",
-                        "request": {"command": {"position": 1}},
-                    },
+                    {"resource": "relay", "method": "DoCommand", "request": {"command": {"position": 1}}},
                     {"sleep": "200ms"},
-                    {
-                        "resource": "relay",
-                        "method": "DoCommand",
-                        "request": {"command": {"position": 0}},
-                    },
+                    {"resource": "relay", "method": "DoCommand", "request": {"command": {"position": 0}}},
                 ]
             }
         },
@@ -695,10 +535,7 @@ async def test_sleep_waits_between_calls():
     lab = await start_lab(config, [relay])
     try:
         started = time.monotonic()
-        await _wait(
-            lab.service,
-            lambda status: status["state"] == "stopped" and status["step_index"] == 2,
-        )
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["step_index"] == 2)
         assert time.monotonic() - started >= 0.15
         assert relay.calls == [{"position": 1}, {"position": 0}]
     finally:
@@ -733,11 +570,7 @@ async def test_background_hold_stops_foreground_and_resumes():
             "charge_hold": {
                 "report_status": "stopped",
                 "steps": [
-                    {
-                        "resource": "base",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "stop"}},
-                    },
+                    {"resource": "base", "method": "DoCommand", "request": {"command": {"op": "stop"}}},
                     {
                         "until": {
                             "every": "50ms",
@@ -768,12 +601,7 @@ async def test_background_hold_stops_foreground_and_resumes():
     }
     lab = await start_lab(config, [power, marker, base])
     try:
-        await _wait(
-            lab.service,
-            lambda current: (
-                current["mode"] == "ready" and current["state"] == "running"
-            ),
-        )
+        await _wait(lab.service, lambda current: current["mode"] == "ready" and current["state"] == "running")
         power.respond = lambda _command: {"readings": {"is_charging": True}}
         await _wait(
             lab.service,
@@ -819,32 +647,19 @@ async def test_then_expression_chooses_next_mode():
             },
             "wait_for_handover": {
                 "steps": [
-                    {
-                        "resource": "marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "handover"}},
-                    },
+                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "handover"}}},
                 ]
             },
             "idle": {
                 "steps": [
-                    {
-                        "resource": "marker",
-                        "method": "DoCommand",
-                        "request": {"command": {"op": "idle"}},
-                    },
+                    {"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "idle"}}},
                 ]
             },
         },
     }
     lab = await start_lab(config, [coffee, marker])
     try:
-        await _wait(
-            lab.service,
-            lambda status: (
-                status["state"] == "stopped" and status["mode"] == "wait_for_handover"
-            ),
-        )
+        await _wait(lab.service, lambda status: status["state"] == "stopped" and status["mode"] == "wait_for_handover")
         assert marker.calls == [{"op": "handover"}]
     finally:
         await lab.close()
@@ -874,9 +689,7 @@ async def test_status_includes_latest_poll_result():
     }
     lab = await start_lab(config, [dock])
     try:
-        status = await _wait(
-            lab.service, lambda current: current.get("result") == {"running": True}
-        )
+        status = await _wait(lab.service, lambda current: current.get("result") == {"running": True})
         assert status["step_kind"] == "until"
         assert status["state"] == "running"
     finally:

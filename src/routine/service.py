@@ -42,9 +42,7 @@ class Routine(Generic, EasyResource):
         return service
 
     @classmethod
-    def validate_config(
-        cls, config: ComponentConfig
-    ) -> tuple[Sequence[str], Sequence[str]]:
+    def validate_config(cls, config: ComponentConfig) -> tuple[Sequence[str], Sequence[str]]:
         parsed = parse_config(struct_to_dict(config.attributes))
         return parsed.resources(), []
 
@@ -61,9 +59,7 @@ class Routine(Generic, EasyResource):
         if self._boot_error:
             raise RuntimeError(self._boot_error)
 
-    async def get_status(
-        self, *, timeout: Optional[float] = None, **kwargs: Any
-    ) -> Mapping[str, ValueTypes]:
+    async def get_status(self, *, timeout: Optional[float] = None, **kwargs: Any) -> Mapping[str, ValueTypes]:
         del timeout, kwargs
         return await self._status()
 
@@ -85,9 +81,7 @@ class Routine(Generic, EasyResource):
         if name == "status":
             return {"status": await self._status()}
         if name == "start":
-            await engine.start(
-                _optional_mode(command.get("mode")), _optional_vars(command.get("vars"))
-            )
+            await engine.start(_optional_mode(command.get("mode")), _optional_vars(command.get("vars")))
             return {"ok": True}
         if name == "stop":
             await engine.stop()
@@ -101,16 +95,10 @@ class Routine(Generic, EasyResource):
         if name == "cancel":
             engine.request_cancel()
             return {"ok": True}
-        raise ValueError(
-            "command must be GetStatus, status, start, stop, set_mode, or cancel"
-        )
+        raise ValueError("command must be GetStatus, status, start, stop, set_mode, or cancel")
 
     async def stop(
-        self,
-        *,
-        extra: Optional[Mapping[str, Any]] = None,
-        timeout: Optional[float] = None,
-        **kwargs: Any,
+        self, *, extra: Optional[Mapping[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
     ) -> None:
         del extra, timeout, kwargs
         self._generation += 1

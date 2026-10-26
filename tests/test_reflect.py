@@ -19,7 +19,4 @@ def test_pool_pulls_well_known_imports_from_the_default_pool():
 
     pool = build_pool({descriptor.name: descriptor})
     message_type = pool.FindMessageTypeByName("test.action.StatusResponse")
-    assert (
-        message_type.fields_by_name["status"].message_type.full_name
-        == "google.protobuf.Struct"
-    )
+    assert message_type.fields_by_name["status"].message_type.full_name == "google.protobuf.Struct"

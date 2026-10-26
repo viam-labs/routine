@@ -12,9 +12,7 @@ Responder = Callable[[dict[str, Any]], Union[dict[str, Any], Awaitable[dict[str,
 
 
 class ScriptedGeneric(Generic):
-    def __init__(
-        self, name: str, trace: Optional[list[tuple[str, str, Any]]] = None
-    ) -> None:
+    def __init__(self, name: str, trace: Optional[list[tuple[str, str, Any]]] = None) -> None:
         super().__init__(name)
         self.trace = trace if trace is not None else []
         self.calls: list[dict[str, Any]] = []
@@ -47,9 +45,7 @@ class ScriptedGeneric(Generic):
 
 
 class FakeServo(Servo):
-    def __init__(
-        self, name: str, trace: Optional[list[tuple[str, str, Any]]] = None
-    ) -> None:
+    def __init__(self, name: str, trace: Optional[list[tuple[str, str, Any]]] = None) -> None:
         super().__init__(name)
         self.trace = trace if trace is not None else []
         self.calls: list[dict[str, Any]] = []
@@ -60,12 +56,7 @@ class FakeServo(Servo):
         self.position = 0
 
     async def move(
-        self,
-        angle: int,
-        *,
-        extra: Optional[dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-        **kwargs: Any,
+        self, angle: int, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
     ) -> None:
         del extra, timeout, kwargs
         self.calls.append({"name": self.name, "angle_deg": angle})
@@ -83,21 +74,13 @@ class FakeServo(Servo):
             raise
 
     async def get_position(
-        self,
-        *,
-        extra: Optional[dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-        **kwargs: Any,
+        self, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
     ) -> int:
         del extra, timeout, kwargs
         return self.position
 
     async def stop(
-        self,
-        *,
-        extra: Optional[dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-        **kwargs: Any,
+        self, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
     ) -> None:
         del extra, timeout, kwargs
 
@@ -108,9 +91,7 @@ class FakeServo(Servo):
 class RecordedService(ServiceBase):
     """A custom-API resource. Calls are recorded by the raw gRPC handler."""
 
-    def __init__(
-        self, name: str, api: API, trace: Optional[list[tuple[str, str, Any]]] = None
-    ) -> None:
+    def __init__(self, name: str, api: API, trace: Optional[list[tuple[str, str, Any]]] = None) -> None:
         self._api = api
         super().__init__(name)
         self.trace = trace if trace is not None else []

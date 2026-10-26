@@ -63,9 +63,7 @@ def test_then_template_is_allowed():
             },
         }
     )
-    assert cfg.modes["dock"].steps[0].then == (
-        "${if result.available then wait_for_handover else idle}"
-    )
+    assert cfg.modes["dock"].steps[0].then == ("${if result.available then wait_for_handover else idle}")
 
 
 def test_then_template_must_be_a_single_expression():
@@ -96,17 +94,9 @@ def test_sleep_step_is_not_a_resource_dependency():
             "modes": {
                 "pulse": {
                     "steps": [
-                        {
-                            "resource": "relay",
-                            "method": "SetPosition",
-                            "request": {"position": 1},
-                        },
+                        {"resource": "relay", "method": "SetPosition", "request": {"position": 1}},
                         {"sleep": "5s"},
-                        {
-                            "resource": "relay",
-                            "method": "SetPosition",
-                            "request": {"position": 0},
-                        },
+                        {"resource": "relay", "method": "SetPosition", "request": {"position": 0}},
                     ]
                 }
             },
@@ -145,54 +135,20 @@ def test_mode_policy_overrides_global():
                         {
                             "resource": "a",
                             "method": "B",
-                            "until": {
-                                "every": "1s",
-                                "resource": "a",
-                                "method": "B",
-                                "when": "true",
-                            },
+                            "until": {"every": "1s", "resource": "a", "method": "B", "when": "true"},
                         }
                     ]
                 }
             }
         },
+        {"modes": {"idle": {"steps": [{"until": {"every": "soon", "resource": "a", "method": "B", "when": "true"}}]}}},
         {
             "modes": {
-                "idle": {
-                    "steps": [
-                        {
-                            "until": {
-                                "every": "soon",
-                                "resource": "a",
-                                "method": "B",
-                                "when": "true",
-                            }
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            "modes": {
-                "idle": {
-                    "steps": [
-                        {
-                            "until": {
-                                "every": "1s",
-                                "resource": "a",
-                                "method": "B",
-                                "when": "result.=",
-                            }
-                        }
-                    ]
-                }
+                "idle": {"steps": [{"until": {"every": "1s", "resource": "a", "method": "B", "when": "result.="}}]}
             }
         },
         {"on_dependency_error": "give_up", "modes": {"idle": {"steps": []}}},
-        {
-            "heartbeat": {"every_secs": 0, "resource": "a", "method": "B"},
-            "modes": {"idle": {"steps": []}},
-        },
+        {"heartbeat": {"every_secs": 0, "resource": "a", "method": "B"}, "modes": {"idle": {"steps": []}}},
         {"modes": {}},
         {"modes": {"idle": {"steps": [{"sleep": "0s"}]}}},
         {"modes": {"idle": {"steps": [{"sleep": "5s", "resource": "relay"}]}}},

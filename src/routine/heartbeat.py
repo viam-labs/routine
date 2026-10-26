@@ -31,18 +31,11 @@ async def run_heartbeat(heartbeat: Heartbeat, engine: Engine, invoker: Invoker) 
             now = time.monotonic()
             if now - last_log >= _LOG_INTERVAL_SECS:
                 last_log = now
-                LOGGER.warning(
-                    "heartbeat to %s.%s failed: %s",
-                    heartbeat.resource,
-                    heartbeat.method,
-                    exc,
-                )
+                LOGGER.warning("heartbeat to %s.%s failed: %s", heartbeat.resource, heartbeat.method, exc)
         await asyncio.sleep(heartbeat.every_secs)
 
 
-def start_heartbeat(
-    heartbeat: Optional[Heartbeat], engine: Engine, invoker: Invoker
-) -> Optional[asyncio.Task[None]]:
+def start_heartbeat(heartbeat: Optional[Heartbeat], engine: Engine, invoker: Invoker) -> Optional[asyncio.Task[None]]:
     if heartbeat is None:
         return None
     return asyncio.create_task(run_heartbeat(heartbeat, engine, invoker))

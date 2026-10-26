@@ -129,11 +129,7 @@ class RoutineConfig:
 
 
 def effective_policy(step: Step, mode: Mode, config: RoutineConfig) -> str:
-    return (
-        step.on_dependency_error
-        or mode.on_dependency_error
-        or config.on_dependency_error
-    )
+    return step.on_dependency_error or mode.on_dependency_error or config.on_dependency_error
 
 
 def parse_config(raw: Any) -> RoutineConfig:
@@ -153,9 +149,7 @@ def parse_config(raw: Any) -> RoutineConfig:
     if "modes" not in raw or not isinstance(raw["modes"], dict) or not raw["modes"]:
         raise ConfigError("modes must be a non-empty object")
 
-    policy = _policy(
-        raw.get("on_dependency_error", "retry_step"), "on_dependency_error"
-    )
+    policy = _policy(raw.get("on_dependency_error", "retry_step"), "on_dependency_error")
     start_mode = raw.get("start_mode", "idle")
     if not isinstance(start_mode, str) or not start_mode:
         raise ConfigError("start_mode must be a mode name")
@@ -174,9 +168,7 @@ def parse_config(raw: Any) -> RoutineConfig:
     for mode in modes.values():
         _check_targets(mode, modes)
         if mode.start is not None and mode.start not in modes:
-            raise ConfigError(
-                f"mode {mode.name!r} start points at unknown mode {mode.start!r}"
-            )
+            raise ConfigError(f"mode {mode.name!r} start points at unknown mode {mode.start!r}")
 
     return RoutineConfig(
         modes=modes,
@@ -224,9 +216,7 @@ def _parse_heartbeat(raw: Any) -> Optional[Heartbeat]:
         raise ConfigError(f"unknown heartbeat fields: {', '.join(sorted(unknown))}")
     every = raw.get("every_secs", 5)
     if isinstance(every, bool) or not isinstance(every, (int, float)) or every <= 0:
-        raise ConfigError(
-            "heartbeat.every_secs must be a number of seconds greater than 0"
-        )
+        raise ConfigError("heartbeat.every_secs must be a number of seconds greater than 0")
     resource = raw.get("resource")
     method = raw.get("method")
     if not isinstance(resource, str) or not resource:
@@ -236,9 +226,7 @@ def _parse_heartbeat(raw: Any) -> Optional[Heartbeat]:
     request = raw.get("request", {})
     if not isinstance(request, dict):
         raise ConfigError("heartbeat.request must be an object")
-    return Heartbeat(
-        resource=resource, method=method, request=request, every_secs=float(every)
-    )
+    return Heartbeat(resource=resource, method=method, request=request, every_secs=float(every))
 
 
 def _parse_mode(name: str, raw: Any) -> Mode:
@@ -256,28 +244,19 @@ def _parse_mode(name: str, raw: Any) -> Mode:
         "start",
     }
     if unknown:
-        raise ConfigError(
-            f"mode {name!r} has unknown fields: {', '.join(sorted(unknown))}"
-        )
+        raise ConfigError(f"mode {name!r} has unknown fields: {', '.join(sorted(unknown))}")
     steps_raw = raw.get("steps", [])
     if not isinstance(steps_raw, list):
         raise ConfigError(f"mode {name!r} steps must be a list")
     where = f"mode {name!r}"
     return Mode(
         name=name,
-        steps=[
-            _parse_step(step, f"{where} step {index}")
-            for index, step in enumerate(steps_raw)
-        ],
+        steps=[_parse_step(step, f"{where} step {index}") for index, step in enumerate(steps_raw)],
         then=_optional_name(raw.get("then"), f"{where} then"),
         pass_vars=_optional_object(raw.get("pass"), f"{where} pass"),
         on_cancel=_parse_on_cancel(raw.get("on_cancel"), name),
-        on_dependency_error=_optional_policy(
-            raw.get("on_dependency_error"), f"{where} on_dependency_error"
-        ),
-        report_status=_optional_report_status(
-            raw.get("report_status"), f"{where} report_status"
-        ),
+        on_dependency_error=_optional_policy(raw.get("on_dependency_error"), f"{where} on_dependency_error"),
+        report_status=_optional_report_status(raw.get("report_status"), f"{where} report_status"),
         start=_optional_name(raw.get("start"), f"{where} start"),
     )
 
@@ -289,17 +268,12 @@ def _parse_on_cancel(raw: Any, mode: str) -> Optional[OnCancel]:
         raise ConfigError(f"mode {mode!r} on_cancel must be an object")
     unknown = set(raw) - {"steps", "then"}
     if unknown:
-        raise ConfigError(
-            f"mode {mode!r} on_cancel has unknown fields: {', '.join(sorted(unknown))}"
-        )
+        raise ConfigError(f"mode {mode!r} on_cancel has unknown fields: {', '.join(sorted(unknown))}")
     steps_raw = raw.get("steps", [])
     if not isinstance(steps_raw, list):
         raise ConfigError(f"mode {mode!r} on_cancel steps must be a list")
     return OnCancel(
-        steps=[
-            _parse_step(step, f"mode {mode!r} on_cancel step {index}")
-            for index, step in enumerate(steps_raw)
-        ],
+        steps=[_parse_step(step, f"mode {mode!r} on_cancel step {index}") for index, step in enumerate(steps_raw)],
         then=_optional_name(raw.get("then"), f"mode {mode!r} on_cancel then"),
     )
 
@@ -319,26 +293,9 @@ def _parse_step(raw: Any, where: str) -> Step:
     raise ConfigError(f"{where} needs resource and method, until, or sleep")
 
 
-_CALL_FIELDS = {
-    "resource",
-    "method",
-    "request",
-    "wait",
-    "timeout",
-    "then",
-    "pass",
-    "on_dependency_error",
-}
+_CALL_FIELDS = {"resource", "method", "request", "wait", "timeout", "then", "pass", "on_dependency_error"}
 _UNTIL_FIELDS = {"until", "then", "pass", "on_dependency_error"}
-_UNTIL_INNER = {
-    "every",
-    "resource",
-    "method",
-    "request",
-    "when",
-    "cancel_when",
-    "timeout",
-}
+_UNTIL_INNER = {"every", "resource", "method", "request", "when", "cancel_when", "timeout"}
 
 
 def _parse_call(raw: dict[str, Any], where: str) -> CallStep:
@@ -368,9 +325,7 @@ def _parse_call(raw: dict[str, Any], where: str) -> CallStep:
         timeout=timeout,
         then=_optional_name(raw.get("then"), f"{where} then"),
         pass_vars=_optional_object(raw.get("pass"), f"{where} pass"),
-        on_dependency_error=_optional_policy(
-            raw.get("on_dependency_error"), f"{where} on_dependency_error"
-        ),
+        on_dependency_error=_optional_policy(raw.get("on_dependency_error"), f"{where} on_dependency_error"),
     )
 
 
@@ -393,9 +348,7 @@ def _parse_until(raw: dict[str, Any], where: str) -> UntilStep:
         raise ConfigError(f"{where} until must be an object")
     inner_unknown = set(inner) - _UNTIL_INNER
     if inner_unknown:
-        raise ConfigError(
-            f"{where} until has unknown fields: {', '.join(sorted(inner_unknown))}"
-        )
+        raise ConfigError(f"{where} until has unknown fields: {', '.join(sorted(inner_unknown))}")
     resource = inner.get("resource")
     method = inner.get("method")
     when = inner.get("when")
@@ -432,9 +385,7 @@ def _parse_until(raw: dict[str, Any], where: str) -> UntilStep:
         timeout=timeout,
         then=_optional_name(raw.get("then"), f"{where} then"),
         pass_vars=_optional_object(raw.get("pass"), f"{where} pass"),
-        on_dependency_error=_optional_policy(
-            raw.get("on_dependency_error"), f"{where} on_dependency_error"
-        ),
+        on_dependency_error=_optional_policy(raw.get("on_dependency_error"), f"{where} on_dependency_error"),
     )
 
 
@@ -507,9 +458,7 @@ def _check_then_template(target: str, where: str) -> None:
     try:
         source = template_expression(target)
     except RefError as exc:
-        raise ConfigError(
-            f"{where} template must be a single ${{...}} expression"
-        ) from exc
+        raise ConfigError(f"{where} template must be a single ${{...}} expression") from exc
     try:
         parse_expr(source)
     except ExprError as exc:

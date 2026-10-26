@@ -137,9 +137,7 @@ async def _from_channel(channel: Any, full_name: str) -> Optional[ServiceDescrip
     return None
 
 
-async def _gather(
-    channel: Any, stub_type: Any, request_type: Any, full_name: str
-) -> dict[str, FileDescriptorProto]:
+async def _gather(channel: Any, stub_type: Any, request_type: Any, full_name: str) -> dict[str, FileDescriptorProto]:
     files: dict[str, FileDescriptorProto] = {}
     stub = stub_type(channel)
     async with stub.ServerReflectionInfo.open() as stream:
@@ -158,9 +156,7 @@ async def _gather(
                     continue
                 reply = await _query(stream, request_type(file_by_filename=missing))
                 if reply is None:
-                    raise RuntimeError(
-                        f"reflection did not return dependency {missing} of {full_name}"
-                    )
+                    raise RuntimeError(f"reflection did not return dependency {missing} of {full_name}")
                 _absorb(files, reply)
         finally:
             await stream.end()

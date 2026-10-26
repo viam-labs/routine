@@ -6,14 +6,7 @@ def _true(source: str, scope: dict) -> bool:
 
 
 def test_comparisons_and_bare_words():
-    scope = {
-        "result": {
-            "status": "handed_over",
-            "cup_present": False,
-            "available": True,
-            "count": 2,
-        }
-    }
+    scope = {"result": {"status": "handed_over", "cup_present": False, "available": True, "count": 2}}
     assert _true("result.status == handed_over", scope)
     assert not _true("result.status == canceled", scope)
     assert _true("result.cup_present == false", scope)
@@ -26,9 +19,7 @@ def test_indexing_and_logic():
     scope = {"result": {"items": [{"name": "cup"}, {"name": "lid"}]}}
     assert _true("result.items[0].name == cup", scope)
     assert _true("result.items[1].name == lid or result.items[0].name == lid", scope)
-    assert _true(
-        "(result.items[0].name == lid) or (result.items[0].name == cup)", scope
-    )
+    assert _true("(result.items[0].name == lid) or (result.items[0].name == cup)", scope)
 
 
 def test_missing_path_is_false():
@@ -58,9 +49,7 @@ def test_split_if_then_else():
     assert evaluate(parse_expr("split(result.for, '_')[1]"), scope) == "office"
     assert (
         evaluate(
-            parse_expr(
-                "if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"
-            ),
+            parse_expr("if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"),
             scope,
         )
         == "office"
@@ -68,9 +57,7 @@ def test_split_if_then_else():
     scope = {"result": {"for": "eliot"}}
     assert (
         evaluate(
-            parse_expr(
-                "if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"
-            ),
+            parse_expr("if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"),
             scope,
         )
         == "eliot"
