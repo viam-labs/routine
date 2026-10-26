@@ -175,8 +175,10 @@ async def test_coffee_delivery_happy_path():
     try:
         await _wait(
             lab.service,
-            lambda status: _methods(trace).count(("delivery_nav", "NavigateToLocation")) >= 2
-            and any(event[1] == "Play" for event in trace),
+            lambda status: (
+                _methods(trace).count(("delivery_nav", "NavigateToLocation")) >= 2
+                and any(event[1] == "Play" for event in trace)
+            ),
         )
         await lab.service.do_command({"command": "stop"})
         methods = _methods(trace)
@@ -207,7 +209,9 @@ async def test_coffee_delivery_happy_path():
 async def test_cancel_returns_tray_and_idles():
     lab, trace = await _boot_coffee("cancel")
     try:
-        await _wait(lab.service, lambda _status: any(event[1] == "Play" for event in trace) or _tray_zero_after_raise(trace))
+        await _wait(
+            lab.service, lambda _status: any(event[1] == "Play" for event in trace) or _tray_zero_after_raise(trace)
+        )
         await _wait(lab.service, lambda status: status["mode"] == "idle" and status["state"] == "running")
         angles = [event[2]["angle_deg"] for event in trace if event[0] == "tray"]
         assert angles == [90, 0]
@@ -398,9 +402,7 @@ async def test_mode_without_then_stops():
     config = {
         "start_mode": "once",
         "modes": {
-            "once": {
-                "steps": [{"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "ran"}}}]
-            }
+            "once": {"steps": [{"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "ran"}}}]}
         },
     }
     lab = await start_lab(config, [marker])
@@ -425,9 +427,7 @@ async def test_do_command_controls():
         "auto_start": False,
         "start_mode": "idle",
         "modes": {
-            "idle": {
-                "steps": [{"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "idle"}}}]
-            },
+            "idle": {"steps": [{"resource": "marker", "method": "DoCommand", "request": {"command": {"op": "idle"}}}]},
             "wait": {
                 "steps": [
                     {
@@ -507,7 +507,10 @@ async def test_heartbeat_reports_while_running_and_stopped():
     }
     lab = await start_lab(config, [watcher, fleet])
     try:
-        await _wait(lab.service, lambda _status: any(call.get("state") == "running" and call.get("mode") == "watch" for call in fleet.calls))
+        await _wait(
+            lab.service,
+            lambda _status: any(call.get("state") == "running" and call.get("mode") == "watch" for call in fleet.calls),
+        )
         await lab.service.do_command({"command": "stop"})
         await _wait(lab.service, lambda _status: any(call.get("state") == "stopped" for call in fleet.calls))
     finally:
@@ -602,18 +605,22 @@ async def test_background_hold_stops_foreground_and_resumes():
         power.respond = lambda _command: {"readings": {"is_charging": True}}
         await _wait(
             lab.service,
-            lambda current: current["state"] == "stopped"
-            and current["background_mode"] == "charge_hold"
-            and {"op": "stop"} in base.calls,
+            lambda current: (
+                current["state"] == "stopped"
+                and current["background_mode"] == "charge_hold"
+                and {"op": "stop"} in base.calls
+            ),
         )
         with pytest.raises(Exception):
             await lab.service.do_command({"command": "start", "mode": "ready"})
         power.respond = lambda _command: {"readings": {"is_charging": False}}
         await _wait(
             lab.service,
-            lambda current: current["state"] == "running"
-            and current["mode"] == "ready"
-            and current["background_mode"] == "charge_check",
+            lambda current: (
+                current["state"] == "running"
+                and current["mode"] == "ready"
+                and current["background_mode"] == "charge_check"
+            ),
         )
     finally:
         await lab.close()

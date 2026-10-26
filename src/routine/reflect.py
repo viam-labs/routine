@@ -15,11 +15,18 @@ from google.protobuf.descriptor import ServiceDescriptor
 from google.protobuf.descriptor_pb2 import FileDescriptorProto
 from google.protobuf.descriptor_pool import Default, DescriptorPool
 from grpclib.client import Channel
-from grpclib.reflection.v1.reflection_grpc import ServerReflectionStub as ServerReflectionStubV1
-from grpclib.reflection.v1.reflection_pb2 import ServerReflectionRequest as ServerReflectionRequestV1
-from grpclib.reflection.v1alpha.reflection_grpc import ServerReflectionStub as ServerReflectionStubV1Alpha
-from grpclib.reflection.v1alpha.reflection_pb2 import ServerReflectionRequest as ServerReflectionRequestV1Alpha
-
+from grpclib.reflection.v1.reflection_grpc import (
+    ServerReflectionStub as ServerReflectionStubV1,
+)
+from grpclib.reflection.v1.reflection_pb2 import (
+    ServerReflectionRequest as ServerReflectionRequestV1,
+)
+from grpclib.reflection.v1alpha.reflection_grpc import (
+    ServerReflectionStub as ServerReflectionStubV1Alpha,
+)
+from grpclib.reflection.v1alpha.reflection_pb2 import (
+    ServerReflectionRequest as ServerReflectionRequestV1Alpha,
+)
 from viam.logging import getLogger
 
 LOGGER = getLogger(__name__)

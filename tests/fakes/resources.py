@@ -22,7 +22,9 @@ class ScriptedGeneric(Generic):
         self.cancelled = 0
         self.respond: Responder = lambda _command: {}
 
-    async def do_command(self, command: dict[str, Any], *, timeout: Optional[float] = None, **kwargs: Any) -> dict[str, Any]:
+    async def do_command(
+        self, command: dict[str, Any], *, timeout: Optional[float] = None, **kwargs: Any
+    ) -> dict[str, Any]:
         del timeout, kwargs
         self.calls.append(dict(command))
         self.trace.append((self.name, "DoCommand", dict(command)))
@@ -53,7 +55,9 @@ class FakeServo(Servo):
         self.cancelled = 0
         self.position = 0
 
-    async def move(self, angle: int, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any) -> None:
+    async def move(
+        self, angle: int, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
+    ) -> None:
         del extra, timeout, kwargs
         self.calls.append({"name": self.name, "angle_deg": angle})
         self.trace.append((self.name, "Move", {"name": self.name, "angle_deg": angle}))
@@ -69,11 +73,15 @@ class FakeServo(Servo):
             self.cancelled += 1
             raise
 
-    async def get_position(self, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any) -> int:
+    async def get_position(
+        self, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
+    ) -> int:
         del extra, timeout, kwargs
         return self.position
 
-    async def stop(self, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any) -> None:
+    async def stop(
+        self, *, extra: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
+    ) -> None:
         del extra, timeout, kwargs
 
     async def is_moving(self) -> bool:

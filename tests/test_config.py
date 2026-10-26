@@ -63,9 +63,7 @@ def test_then_template_is_allowed():
             },
         }
     )
-    assert cfg.modes["dock"].steps[0].then == (
-        "${if result.available then wait_for_handover else idle}"
-    )
+    assert cfg.modes["dock"].steps[0].then == ("${if result.available then wait_for_handover else idle}")
 
 
 def test_then_template_must_be_a_single_expression():
@@ -101,7 +99,7 @@ def test_sleep_step_is_not_a_resource_dependency():
                         {"resource": "relay", "method": "SetPosition", "request": {"position": 0}},
                     ]
                 }
-            }
+            },
         }
     )
     assert [step.kind for step in cfg.modes["pulse"].steps] == ["call", "sleep", "call"]
@@ -130,9 +128,25 @@ def test_mode_policy_overrides_global():
     "raw",
     [
         {"modes": {"idle": {"steps": [], "then": "missing"}}},
-        {"modes": {"idle": {"steps": [{"resource": "a", "method": "B", "until": {"every": "1s", "resource": "a", "method": "B", "when": "true"}}]}}},
+        {
+            "modes": {
+                "idle": {
+                    "steps": [
+                        {
+                            "resource": "a",
+                            "method": "B",
+                            "until": {"every": "1s", "resource": "a", "method": "B", "when": "true"},
+                        }
+                    ]
+                }
+            }
+        },
         {"modes": {"idle": {"steps": [{"until": {"every": "soon", "resource": "a", "method": "B", "when": "true"}}]}}},
-        {"modes": {"idle": {"steps": [{"until": {"every": "1s", "resource": "a", "method": "B", "when": "result.="}}]}}},
+        {
+            "modes": {
+                "idle": {"steps": [{"until": {"every": "1s", "resource": "a", "method": "B", "when": "result.="}}]}
+            }
+        },
         {"on_dependency_error": "give_up", "modes": {"idle": {"steps": []}}},
         {"heartbeat": {"every_secs": 0, "resource": "a", "method": "B"}, "modes": {"idle": {"steps": []}}},
         {"modes": {}},

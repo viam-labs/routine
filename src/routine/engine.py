@@ -458,7 +458,9 @@ class Engine:
             raise StepFailure(self.config.on_dependency_error, RefError(f"unknown mode {target!r}"))
         return target
 
-    def _passed(self, status: dict[str, Any], step: Step, variables: dict[str, Any], result: Any, mode: Mode) -> dict[str, Any]:
+    def _passed(
+        self, status: dict[str, Any], step: Step, variables: dict[str, Any], result: Any, mode: Mode
+    ) -> dict[str, Any]:
         if not step.pass_vars:
             return {}
         try:
@@ -469,7 +471,9 @@ class Engine:
             raise StepFailure(effective_policy(step, mode, self.config), RefError("pass must resolve to an object"))
         return passed
 
-    def _passed_mode(self, status: dict[str, Any], mode: Mode, variables: dict[str, Any], result: Any) -> dict[str, Any]:
+    def _passed_mode(
+        self, status: dict[str, Any], mode: Mode, variables: dict[str, Any], result: Any
+    ) -> dict[str, Any]:
         if not mode.pass_vars:
             return {}
         try:

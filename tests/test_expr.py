@@ -49,9 +49,7 @@ def test_split_if_then_else():
     assert evaluate(parse_expr("split(result.for, '_')[1]"), scope) == "office"
     assert (
         evaluate(
-            parse_expr(
-                "if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"
-            ),
+            parse_expr("if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"),
             scope,
         )
         == "office"
@@ -59,9 +57,7 @@ def test_split_if_then_else():
     scope = {"result": {"for": "eliot"}}
     assert (
         evaluate(
-            parse_expr(
-                "if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"
-            ),
+            parse_expr("if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]"),
             scope,
         )
         == "eliot"

@@ -12,7 +12,7 @@ from viam.resource.easy_resource import EasyResource
 from viam.services.generic import Generic
 from viam.utils import ValueTypes, struct_to_dict
 
-from routine.config import ConfigError, RoutineConfig, parse_config
+from routine.config import RoutineConfig, parse_config
 from routine.engine import Engine
 from routine.heartbeat import start_heartbeat
 from routine.invoker import Invoker
@@ -97,7 +97,9 @@ class Routine(Generic, EasyResource):
             return {"ok": True}
         raise ValueError("command must be GetStatus, status, start, stop, set_mode, or cancel")
 
-    async def stop(self, *, extra: Optional[Mapping[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any) -> None:
+    async def stop(
+        self, *, extra: Optional[Mapping[str, Any]] = None, timeout: Optional[float] = None, **kwargs: Any
+    ) -> None:
         del extra, timeout, kwargs
         self._generation += 1
         async with self._life:
@@ -150,7 +152,6 @@ class Routine(Generic, EasyResource):
         self._engine = None
         if engine is not None:
             await engine.shutdown()
-
 
     async def _status(self) -> dict[str, Any]:
         await self.ready()

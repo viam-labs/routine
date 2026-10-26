@@ -34,11 +34,17 @@ def test_missing_path():
 
 
 def test_template_split_if_then_else():
-    assert resolve(
-        "Coffee for ${if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}",
-        {"result": {"for": "eliot_office"}},
-    ) == "Coffee for office"
-    assert resolve(
-        "Coffee for ${if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}",
-        {"result": {"for": "eliot"}},
-    ) == "Coffee for eliot"
+    assert (
+        resolve(
+            "Coffee for ${if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}",
+            {"result": {"for": "eliot_office"}},
+        )
+        == "Coffee for office"
+    )
+    assert (
+        resolve(
+            "Coffee for ${if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}",
+            {"result": {"for": "eliot"}},
+        )
+        == "Coffee for eliot"
+    )
