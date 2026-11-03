@@ -73,7 +73,10 @@ class Engine:
         snap = dict(self.status)
         snap["vars"] = _copy(self.status["vars"])
         snap["result"] = _copy(self.status["result"])
-        snap["background_mode"] = self.background_status.get("mode")
+        if self._monitor is not None and not self._monitor.done():
+            snap["background_mode"] = self.background_status.get("mode")
+        else:
+            snap["background_mode"] = None
         if self._hold_status:
             snap["state"] = self._hold_status
         elif snap["state"] == "running":
@@ -89,7 +92,8 @@ class Engine:
         if not self.config.background:
             return
         async with self._lock:
-            await self._cancel_monitor()
+            if self._monitor is not None and not self._monitor.done():
+                return
             self._monitor_stop = False
             self._monitor = asyncio.create_task(self._monitor_main(self.config.background, {}))
 
@@ -101,6 +105,7 @@ class Engine:
             raise ValueError("vars must be an object")
         if self.holding():
             raise RuntimeError("routine is held by the background mode")
+        await self.start_monitor()
         async with self._lock:
             await self._cancel_runner()
             self._stop_requested = False
@@ -110,10 +115,15 @@ class Engine:
     async def stop(self) -> None:
         async with self._lock:
             self._stop_requested = True
+            self._monitor_stop = True
             await self._cancel_runner()
+            await self._cancel_monitor()
             await self._cancel_fire()
+            self._hold_status = None
             self.status["state"] = "stopped"
+            self.background_status["state"] = "stopped"
             self._touch(self.status)
+            self._touch(self.background_status)
 
     async def shutdown(self) -> None:
         async with self._lock:

@@ -1,4 +1,4 @@
-"""Resolve ``${...}`` placeholders in strings against a scope."""
+"""Resolve ``{{...}}`` placeholders in strings against a scope."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from typing import Any
 
 from routine.expr import ExprError, evaluate, parse_expr
 
-_TEMPLATE = re.compile(r"\$\{([^}]+)\}")
-_ONLY_REF = re.compile(r"^\$\{([^}]+)\}$")
+_TEMPLATE = re.compile(r"\{\{([^}]+)\}\}")
+_ONLY_REF = re.compile(r"^\{\{([^}]+)\}\}$")
 
 
 class RefError(ValueError):
@@ -22,20 +22,20 @@ def resolve(value: Any, scope: dict[str, Any]) -> Any:
         if set(value.keys()) == {"literal"}:
             return value["literal"]
         return {key: resolve(item, scope) for key, item in value.items()}
-    if isinstance(value, str) and "${" in value:
+    if isinstance(value, str) and "{{" in value:
         return render_template(value, scope)
     return value
 
 
 def is_template(value: str) -> bool:
-    return "${" in value
+    return "{{" in value
 
 
 def template_expression(source: str) -> str:
-    """Return the expression inside a single ``${...}`` template."""
+    """Return the expression inside a single ``{{...}}`` template."""
     only = _ONLY_REF.fullmatch(source.strip())
     if only is None:
-        raise RefError("template must be a single ${...} expression")
+        raise RefError("template must be a single {{...}} expression")
     return only.group(1)
 
 
@@ -51,7 +51,7 @@ def render_template(source: str, scope: dict[str, Any]) -> Any:
 
 
 def resolve_mode_name(source: str, scope: dict[str, Any]) -> str:
-    """Resolve a ``then`` target. Plain names stay as-is; ``${...}`` is evaluated.
+    """Resolve a ``then`` target. Plain names stay as-is; ``{{...}}`` is evaluated.
 
     Bare words inside the expression are mode names, so missing scope roots are
     treated as strings rather than errors.

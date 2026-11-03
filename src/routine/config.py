@@ -436,9 +436,13 @@ def _check_targets(mode: Mode, modes: dict[str, Mode]) -> None:
     def check(target: Optional[str], where: str) -> None:
         if target is None:
             return
-        if "${" in target:
+        if "{{" in target:
             _check_then_template(target, where)
             return
+        if "${" in target:
+            raise ConfigError(
+                f"{where} uses deprecated ${{...}}; use {{{{...}}}} templates instead"
+            )
         if target not in modes:
             raise ConfigError(f"{where} points at unknown mode {target!r}")
 
@@ -458,7 +462,7 @@ def _check_then_template(target: str, where: str) -> None:
     try:
         source = template_expression(target)
     except RefError as exc:
-        raise ConfigError(f"{where} template must be a single ${{...}} expression") from exc
+        raise ConfigError(f"{where} template must be a single {{{{...}}}} expression") from exc
     try:
         parse_expr(source)
     except ExprError as exc:

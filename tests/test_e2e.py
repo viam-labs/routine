@@ -77,7 +77,7 @@ def _coffee_config() -> dict[str, Any]:
                             "when": "result.available",
                         },
                         "then": "pickup",
-                        "pass": {"order": "${result.order}"},
+                        "pass": {"order": "{{result.order}}"},
                     },
                 ]
             },
@@ -92,7 +92,7 @@ def _coffee_config() -> dict[str, Any]:
                     {
                         "resource": "coffee_maker:orders",
                         "method": "DoCommand",
-                        "request": {"command": {"ready_for_order": {"order_id": "${order.id}"}}},
+                        "request": {"command": {"ready_for_order": {"order_id": "{{order.id}}"}}},
                     },
                     {
                         "until": {
@@ -100,7 +100,7 @@ def _coffee_config() -> dict[str, Any]:
                             "timeout": "300ms",
                             "resource": "coffee_maker:orders",
                             "method": "DoCommand",
-                            "request": {"command": {"order_status": {"order_id": "${order.id}"}}},
+                            "request": {"command": {"order_status": {"order_id": "{{order.id}}"}}},
                             "when": "result.status == handed_over",
                             "cancel_when": "result.status == canceled",
                         }
@@ -108,7 +108,7 @@ def _coffee_config() -> dict[str, Any]:
                     {"resource": "tray", "method": "Move", "request": {"angle_deg": 0}},
                 ],
                 "then": "delivering",
-                "pass": {"order": "${order}"},
+                "pass": {"order": "{{order}}"},
                 "on_cancel": {
                     "steps": [{"resource": "tray", "method": "Move", "request": {"angle_deg": 0}}],
                     "then": "idle",
@@ -119,7 +119,7 @@ def _coffee_config() -> dict[str, Any]:
                     {
                         "resource": "delivery_nav",
                         "method": "NavigateToLocation",
-                        "request": {"location_name": "${order.destination}"},
+                        "request": {"location_name": "{{order.destination}}"},
                     },
                     {"resource": "speaker", "method": "Play", "request": {"sound": "delivery_arrived"}},
                     {
@@ -487,7 +487,7 @@ async def test_heartbeat_reports_while_running_and_stopped():
             "every_secs": 0.05,
             "resource": "fleet_status",
             "method": "DoCommand",
-            "request": {"command": {"mode": "${status.mode}", "state": "${status.state}"}},
+            "request": {"command": {"mode": "{{status.mode}}", "state": "{{status.state}}"}},
         },
         "modes": {
             "watch": {
@@ -538,6 +538,70 @@ async def test_sleep_waits_between_calls():
         await _wait(lab.service, lambda status: status["state"] == "stopped" and status["step_index"] == 2)
         assert time.monotonic() - started >= 0.15
         assert relay.calls == [{"position": 1}, {"position": 0}]
+    finally:
+        await lab.close()
+
+
+@pytest.mark.asyncio
+async def test_auto_start_false_does_not_run_background_until_start():
+    power = ScriptedGeneric("power")
+    power.respond = lambda _command: {"readings": {"is_charging": False}}
+    marker = ScriptedGeneric("marker")
+    config = {
+        "auto_start": False,
+        "background": "charge_check",
+        "start_mode": "ready",
+        "modes": {
+            "charge_check": {
+                "steps": [
+                    {
+                        "until": {
+                            "every": "50ms",
+                            "resource": "power",
+                            "method": "DoCommand",
+                            "request": {"command": {"query": "charge"}},
+                            "when": "result.readings.is_charging == true",
+                        },
+                        "then": "charge_check",
+                    }
+                ]
+            },
+            "ready": {
+                "steps": [
+                    {
+                        "until": {
+                            "every": "1h",
+                            "resource": "marker",
+                            "method": "DoCommand",
+                            "request": {"command": {"op": "work"}},
+                            "when": "result.done == true",
+                        }
+                    }
+                ]
+            },
+        },
+    }
+    lab = await start_lab(config, [power, marker])
+    try:
+        await asyncio.sleep(0.2)
+        status = await _status(lab.service)
+        assert status["state"] == "stopped"
+        assert status["mode"] is None
+        assert status["background_mode"] is None
+        assert power.calls == []
+        await lab.service.do_command({"command": "start"})
+        await _wait(
+            lab.service,
+            lambda current: current["mode"] == "ready"
+            and current["background_mode"] == "charge_check"
+            and current["state"] == "running",
+        )
+        assert power.calls
+        await lab.service.do_command({"command": "stop"})
+        await _wait(
+            lab.service,
+            lambda current: current["state"] == "stopped" and current["background_mode"] is None,
+        )
     finally:
         await lab.close()
 
@@ -640,8 +704,8 @@ async def test_then_expression_chooses_next_mode():
                         "resource": "coffee",
                         "method": "DoCommand",
                         "request": {"command": {"delivery_machine_ready": True}},
-                        "then": "${if result.available then wait_for_handover else idle}",
-                        "pass": {"order": "${result}"},
+                        "then": "{{if result.available then wait_for_handover else idle}}",
+                        "pass": {"order": "{{result}}"},
                     }
                 ]
             },
