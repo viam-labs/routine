@@ -440,9 +440,7 @@ def _check_targets(mode: Mode, modes: dict[str, Mode]) -> None:
             _check_then_template(target, where)
             return
         if "${" in target:
-            raise ConfigError(
-                f"{where} uses deprecated ${{...}}; use {{{{...}}}} templates instead"
-            )
+            raise ConfigError(f"{where} uses deprecated ${{...}}; use {{{{...}}}} templates instead")
         if target not in modes:
             raise ConfigError(f"{where} points at unknown mode {target!r}")
 

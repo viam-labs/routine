@@ -592,9 +592,11 @@ async def test_auto_start_false_does_not_run_background_until_start():
         await lab.service.do_command({"command": "start"})
         await _wait(
             lab.service,
-            lambda current: current["mode"] == "ready"
-            and current["background_mode"] == "charge_check"
-            and current["state"] == "running",
+            lambda current: (
+                current["mode"] == "ready"
+                and current["background_mode"] == "charge_check"
+                and current["state"] == "running"
+            ),
         )
         assert power.calls
         await lab.service.do_command({"command": "stop"})
