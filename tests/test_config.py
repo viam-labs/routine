@@ -14,7 +14,7 @@ def test_example_config_parses():
     assert cfg.on_dependency_error == "retry_step"
     assert cfg.modes["pickup"].on_cancel is not None
     assert cfg.modes["pickup"].on_cancel.then == "idle"
-    assert cfg.modes["pickup"].pass_vars == {"order": "${order}"}
+    assert cfg.modes["pickup"].pass_vars == {"order": "{{order}}"}
     assert "delivery_nav" in cfg.resources()
     assert cfg.heartbeat is None
 
@@ -54,7 +54,7 @@ def test_then_template_is_allowed():
                         {
                             "resource": "coffee",
                             "method": "DoCommand",
-                            "then": "${if result.available then wait_for_handover else idle}",
+                            "then": "{{if result.available then wait_for_handover else idle}}",
                         }
                     ]
                 },
@@ -63,7 +63,7 @@ def test_then_template_is_allowed():
             },
         }
     )
-    assert cfg.modes["dock"].steps[0].then == ("${if result.available then wait_for_handover else idle}")
+    assert cfg.modes["dock"].steps[0].then == ("{{if result.available then wait_for_handover else idle}}")
 
 
 def test_then_template_must_be_a_single_expression():
@@ -77,7 +77,28 @@ def test_then_template_must_be_a_single_expression():
                             {
                                 "resource": "coffee",
                                 "method": "DoCommand",
-                                "then": "go ${result.available}",
+                                "then": "go {{result.available}}",
+                            }
+                        ]
+                    },
+                    "idle": {"steps": []},
+                },
+            }
+        )
+
+
+def test_then_rejects_dollar_brace_templates():
+    with pytest.raises(ConfigError, match=r"deprecated"):
+        parse_config(
+            {
+                "start_mode": "dock",
+                "modes": {
+                    "dock": {
+                        "steps": [
+                            {
+                                "resource": "coffee",
+                                "method": "DoCommand",
+                                "then": "${if result.available then idle else idle}",
                             }
                         ]
                     },

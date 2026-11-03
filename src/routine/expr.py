@@ -1,4 +1,4 @@
-"""A small expression language for ``when``, ``cancel_when``, and ``${...}``.
+"""A small expression language for ``when``, ``cancel_when``, and ``{{...}}``.
 
 Never calls ``eval``. Supports dotted paths, list indexes, comparisons,
 ``and`` / ``or`` / ``not``, parentheses, ``if`` / ``then`` / ``else``,

@@ -35,8 +35,8 @@ This routine extends a switch, waits five seconds, retracts it, and stops:
 | --- | --- | --- |
 | `modes` | required | Named modes. Each has `steps`, and may have `then`, `pass`, `on_cancel`, `on_dependency_error`, `report_status`, and `start`. |
 | `start_mode` | `idle` | Foreground mode entered on start. Must name a configured mode. |
-| `auto_start` | `true` | Start that foreground mode when the service configures. |
-| `background` | off | One mode that runs continuously beside the foreground. |
+| `auto_start` | `true` | On configure, start the foreground `start_mode` and the `background` mode (if set). When `false`, nothing runs until `start` / `set_mode`. |
+| `background` | off | One mode that runs continuously beside the foreground once the routine has started. |
 | `on_dependency_error` | `retry_step` | What to do when a resource call fails. `retry_step`, `restart_mode`, `start_mode`, or `stop`. |
 | `retry` | `1s`, max `30s` | Backoff for `retry_step`. Durations look like `500ms`, `10s`, `3m`, `1h`. |
 | `heartbeat` | off | Status report that runs on its own timer. |
@@ -49,7 +49,7 @@ Steps run one after another. The next step starts when the current one returns. 
 
 ### Background mode
 
-`background` names one mode that starts with the service and keeps running while foreground modes come and go. Only one background mode runs at a time; its `then` transitions stay in the background runner.
+`background` names one mode that runs beside the foreground once the routine has started (`auto_start`, or an explicit `start` / `set_mode`). It keeps running while foreground modes come and go, and stops with `stop`. Only one background mode runs at a time; its `then` transitions stay in the background runner.
 
 `report_status: "stopped"` on a background mode forces `GetStatus` and the heartbeat to report `stopped`, and stops the foreground mode when that background mode is entered. Foreground `start` / `set_mode` are refused while held. When the background leaves that mode, status is released.
 
@@ -114,10 +114,10 @@ On a step, `then` runs as soon as that step finishes and skips every step after 
 
 A mode with no `then` stops the routine. It does not repeat. The same is true of `on_cancel` when that block has no `then`.
 
-`then` may be a fixed mode name or a single `${...}` expression evaluated after the step returns. Bare words in that expression are mode names:
+`then` may be a fixed mode name or a single `{{...}}` expression evaluated after the step returns. Bare words in that expression are mode names:
 
 ```json
-"then": "${if result.available then wait_for_handover else idle}"
+"then": "{{if result.available then wait_for_handover else idle}}"
 ```
 
 ### pass
@@ -129,30 +129,30 @@ The step's `pass` is used when that step's `then` runs. The mode's `pass` is use
 `on_cancel`'s own `then` also starts the next mode with no variables. A step inside `on_cancel` can still pass values when that step has its own `then`.
 
 ```json
-"pass": { "order": "${order}" }
+"pass": { "order": "{{order}}" }
 ```
 
-Any string that contains `${...}` is filled in from the current variables, the latest `result`, or `status`. A string that is only `${...}` keeps the value as-is, including objects. Any other text builds a string, and each placeholder is stringified.
+Any string that contains `{{...}}` is filled in from the current variables, the latest `result`, or `status`. A string that is only `{{...}}` keeps the value as-is, including objects. Any other text builds a string, and each placeholder is stringified. Use `{{...}}` rather than `${...}` so Viam RDK does not treat the strings as its own config placeholders.
 
 ```json
 {
   "resource": "tts",
   "method": "DoCommand",
   "request": {
-    "text": "Coffee for ${result.for}"
+    "text": "Coffee for {{result.for}}"
   }
 }
 ```
 
-Inside `${...}` you can use paths, `split(value, sep)`, indexes, and `if … then … else …`:
+Inside `{{...}}` you can use paths, `split(value, sep)`, indexes, and `if … then … else …`:
 
 ```json
-"text": "Coffee for ${if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}"
+"text": "Coffee for {{if split(result.for, '_')[1] then split(result.for, '_')[1] else split(result.for, '_')[0]}}"
 ```
 
 That uses the part after `_` when present, otherwise the whole value. A missing index is false.
 
-`{"literal": "Coffee for ${result.for}"}` keeps that text as written, with no substitution.
+`{"literal": "Coffee for {{result.for}}"}` keeps that text as written, with no substitution.
 
 In the delivery example, pickup's `pass` copies the existing `order` variable. The last pickup step moves the tray, so `result` at the end of the mode is that move, not the order.
 
@@ -211,7 +211,7 @@ Set it on the routine, on a mode, or on a call or `until` step. The step wins, t
   "wait": false,
   "timeout": "5s",
   "then": "next_mode",
-  "pass": { "order": "${order}" },
+  "pass": { "order": "{{order}}" },
   "on_dependency_error": "stop"
 }
 ```
@@ -242,13 +242,13 @@ The routine waits after the previous step returns, then runs the next step. Stop
     "every": "5s",
     "resource": "coffee_maker:orders",
     "method": "DoCommand",
-    "request": { "order_status": { "order_id": "${order.id}" } },
+    "request": { "order_status": { "order_id": "{{order.id}}" } },
     "when": "result.status == handed_over",
     "cancel_when": "result.status == canceled",
     "timeout": "3m"
   },
   "then": "delivering",
-  "pass": { "order": "${result.order}" }
+  "pass": { "order": "{{result.order}}" }
 }
 ```
 
@@ -265,7 +265,7 @@ The method is polled immediately, then every `every`, until `when` is true. `can
   "every_secs": 5,
   "resource": "fleet_status",
   "method": "DoCommand",
-  "request": { "mode": "${status.mode}", "state": "${status.state}" }
+  "request": { "mode": "{{status.mode}}", "state": "{{status.state}}" }
 }
 ```
 
